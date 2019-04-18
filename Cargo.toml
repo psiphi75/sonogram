@@ -7,8 +7,8 @@ license = "GPL-3.0-or-later"
 readme = "README.md"
 edition = "2018"
 repository = "https://github.com/psiphi75/rust-sonogram"
-keywords = ["spectrogram", "sonogram", "audio"]
-categories = ["fft", "dsp", "fourier", "spectrogram", "multimedia::audio"]
+keywords = ["spectrogram", "spectrograph", "sonogram", "audio", "fft", "dsp", "dft"]
+categories = ["multimedia::images", "science", "multimedia::audio", "visualization"]
 
 
 [dependencies]
