@@ -1,0 +1,11 @@
+[package]
+name = "spectrograph"
+version = "0.1.0"
+authors = ["Simon Werner <simonwerner@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+hound = "3.4.0"
+num = "0.2.0"
+clap = "2.33.0"
+png = "0.14.0"
