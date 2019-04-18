@@ -1,13 +1,13 @@
 [package]
 name = "sonogram"
 description = "A spectrograph utility written in Rust"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Simon M. Werner <simonwerner@gmail.com>"]
 license = "GPL-3.0-or-later"
 readme = "README.md"
 edition = "2018"
 repository = "https://github.com/psiphi75/rust-sonogram"
-keywords = ["spectrogram", "spectrograph", "sonogram", "audio", "fft", "dsp", "dft"]
+keywords = ["spectrogram", "spectrograph", "audio", "fft", "dft"]
 categories = ["multimedia::images", "science", "multimedia::audio", "visualization"]
 
 
