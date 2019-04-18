@@ -44,10 +44,12 @@ type WindowFn = fn(u32, u32) -> f32;
 ///
 /// # Example
 ///
+/// ```Rust
 ///   let mut spectrograph = SpecOptionsBuilder::new(512, 128)
 ///     .set_window_fn(utility::blackman_harris)
 ///     .load_data_from_file(&std::path::Path::new("test.wav"))
 ///     .build();
+/// ```
 ///
 pub struct SpecOptionsBuilder {
   width: u32,
@@ -215,12 +217,14 @@ impl SpecOptionsBuilder {
 ///
 /// # Example
 ///
+/// ```Rust
 ///   let mut spectrograph = SpecOptionsBuilder::new(512, 128)
 ///     .load_data_from_file(&std::path::Path::new(wav_file))
 ///     .build();
 ///  
 ///   spectrograph.compute(2048, 0.8);
 ///   spectrograph.save_as_png(&std::path::Path::new(png_file), false);
+/// ```
 ///
 pub struct Spectrograph {
   width: u32,
