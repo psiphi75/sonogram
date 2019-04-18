@@ -1,8 +1,15 @@
 [package]
-name = "spectrograph"
-version = "0.1.0"
-authors = ["Simon Werner <simonwerner@gmail.com>"]
+name = "sonogram"
+description = "A spectrograph utility written in Rust"
+version = "0.2.0"
+authors = ["Simon M. Werner <simonwerner@gmail.com>"]
+license = "GPL-3.0-or-later"
+readme = "README.md"
 edition = "2018"
+repository = "https://github.com/psiphi75/rust-sonogram"
+keywords = ["spectrogram", "sonogram", "audio"]
+categories = ["fft", "dsp", "fourier", "spectrogram", "multimedia::audio"]
+
 
 [dependencies]
 hound = "3.4.0"

@@ -292,7 +292,7 @@ impl Spectrograph {
   /// # Arguments
   ///
   ///  * `fname` - The path to the PNG to save to the filesystem.
-  ///  * `log_mode` - If the colour intensity should use a log function.
+  ///  * `log_mode` - Apply the log function to the frequency scale.
   ///
   pub fn save_as_png(&mut self, fname: &Path, log_mode: bool) {
     let data_len = self.spectrogram[0].len();
