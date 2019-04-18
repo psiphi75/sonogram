@@ -16,10 +16,10 @@
  */
 
 extern crate clap;
-extern crate spectrograph;
+extern crate sonogram;
 
 use clap::{App, Arg};
-use spectrograph::{spectrograph::SpecOptionsBuilder, utility};
+use sonogram::{spectrograph::SpecOptionsBuilder, utility};
 
 fn main() {
   let matches = App::new("sonogram")

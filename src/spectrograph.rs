@@ -374,7 +374,7 @@ impl Spectrograph {
       let mut signal: Vec<Complex<f32>> = self.data[start..]
         .iter()
         .take(chunk_len)
-        .map(|d| Complex::new(*d as f32, 0.0))
+        .map(|d| Complex::new(f32::from(*d), 0.0))
         .collect();
 
       self.transform(&mut signal);

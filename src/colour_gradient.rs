@@ -91,7 +91,7 @@ impl ColourGradient {
   }
 
   fn interpolate(&self, start: u8, finish: u8, ratio: f32) -> u8 {
-    ((f32::from(finish) - f32::from(start)) * ratio + start as f32).round() as u8
+    ((f32::from(finish) - f32::from(start)) * ratio + f32::from(start)).round() as u8
   }
 
   pub fn set_max(&mut self, max: f32) {
