@@ -52,6 +52,7 @@ fn main() {
   let mut spectrograph = SpecOptionsBuilder::new(1024, 256)
     .set_window_fn(utility::blackman_harris)
     .load_data_from_file(&std::path::Path::new(wav_file))
+    .downsample(2)
     .build();
 
   spectrograph.compute(2048, 0.8);

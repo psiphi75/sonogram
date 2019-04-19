@@ -55,7 +55,6 @@ pub struct SpecOptionsBuilder {
   width: u32,
   height: u32,
   sample_rate: u32,
-  max_frequency: u32,
   data: Vec<i16>,
   window: WindowFn,
 }
@@ -75,7 +74,6 @@ impl SpecOptionsBuilder {
       width,
       height,
       sample_rate: 8000,
-      max_frequency: 8000 / 2,
       data: vec![],
       window: utility::blackman_harris,
     }
@@ -110,16 +108,13 @@ impl SpecOptionsBuilder {
     // TODO: We want to be able to handle multiple channels
     assert_eq!(reader.spec().channels, 1);
 
-    let sample_rate = reader.spec().sample_rate;
-
     let data = reader
       .samples::<i16>()
       .map(|x| x.unwrap())
       .collect::<Vec<i16>>();
+    let sample_rate = reader.spec().sample_rate;
 
-    self.load_data_from_memory(data, sample_rate);
-
-    self
+    self.load_data_from_memory(data, sample_rate)
   }
 
   /// Load data directly from memory.
@@ -136,7 +131,6 @@ impl SpecOptionsBuilder {
     let audio_length_sec = self.data.len() as u32 / self.sample_rate;
     println!("Length (s): {}", audio_length_sec);
 
-    self.max_frequency = self.sample_rate / 2;
     self
   }
 
@@ -149,10 +143,17 @@ impl SpecOptionsBuilder {
   ///  * `divisor` - How much to reduce the data by.
   ///
   pub fn downsample(&mut self, divisor: usize) -> &mut Self {
-    if divisor <= 1 {
+    if divisor == 0 {
       panic!("The divisor is too small");
     }
+    if divisor == 1 {
+      return self;
+    }
+    if self.data.len() == 0 {
+      panic!("Need to load the data before calling this function");
+    }
 
+    let mut j = 0;
     for i in (0..self.data.len() - divisor).step_by(divisor) {
       let sum: i32 = self.data[i..i + divisor]
         .iter()
@@ -161,9 +162,12 @@ impl SpecOptionsBuilder {
           sum
         });
       let avg = sum / divisor as i32;
-      self.data[i] = avg as i16;
+
+      self.data[j] = avg as i16;
+      j += 1;
     }
     self.data.resize(self.data.len() / divisor, 0);
+    self.sample_rate /= divisor as u32;
 
     println!("New length is: {}", self.data.len());
     self
@@ -281,7 +285,6 @@ impl Spectrograph {
       new_len += step;
     }
     if new_len != self.data.len() {
-      println!("Padding data.");
       new_len += chunk_len;
       let padding = &mut vec![0; new_len - self.data.len()];
       self.data.append(padding);
@@ -320,17 +323,16 @@ impl Spectrograph {
     let mut img: Vec<u8> = vec![];
 
     for y in (0..self.height).rev() {
-      for x in 0..self.spectrogram.len() {
+      for x in 0..self.width {
         let freq = if log_mode {
           img_len_used
-            - 1.0
             - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
         } else {
           let ratio = y as f32 / self.height as f32;
           ratio * img_len_used
         };
 
-        let colour = self.get_colour(self.spectrogram[x][freq as usize], 15.0);
+        let colour = self.get_colour(self.spectrogram[x as usize][freq as usize], 15.0);
         img.extend(colour.to_vec());
       }
     }
@@ -362,20 +364,16 @@ impl Spectrograph {
     self.spectrogram.reserve(self.width as usize);
 
     println!("Computing chunks.");
-    let num_chunks = self.get_number_of_chunks(chunk_len, step);
+    let num_chunks = self.get_number_of_chunks(chunk_len, step) as f32;
     println!("Number of Chunks: {}", num_chunks);
 
-    let chunk_width_ratio = num_chunks as f32 / self.width as f32;
+    let chunk_width_ratio = num_chunks / self.width as f32;
 
-    let mut j = 0;
-    let mut float_j = 0.0;
+    let mut j = 0.0;
 
     while j < num_chunks {
-      float_j += chunk_width_ratio;
-      j = float_j as usize;
-
-      let start = j * step;
-      let mut signal: Vec<Complex<f32>> = self.data[start..]
+      let p = j as usize * step;
+      let mut signal: Vec<Complex<f32>> = self.data[p..]
         .iter()
         .take(chunk_len)
         .map(|d| Complex::new(f32::from(*d), 0.0))
@@ -383,6 +381,8 @@ impl Spectrograph {
 
       self.transform(&mut signal);
       self.spectrogram.push(signal);
+
+      j += chunk_width_ratio;
     }
   }
 
