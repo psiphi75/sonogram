@@ -27,6 +27,7 @@ use hound;
 use png::HasParameters; // To use encoder.set()
 
 use crate::colour_gradient::{ColourGradient, RGBAColour};
+use crate::errors::SonogramError;
 use crate::utility;
 
 type Spectrogram = Vec<Vec<Complex<f32>>>;
@@ -47,16 +48,17 @@ type WindowFn = fn(u32, u32) -> f32;
 /// ```Rust
 ///   let mut spectrograph = SpecOptionsBuilder::new(512, 128)
 ///     .set_window_fn(utility::blackman_harris)
-///     .load_data_from_file(&std::path::Path::new("test.wav"))
+///     .load_data_from_file(&std::path::Path::new("test.wav"))?
 ///     .build();
 /// ```
 ///
 pub struct SpecOptionsBuilder {
-  width: u32,
-  height: u32,
-  sample_rate: u32,
-  data: Vec<i16>,
-  window: WindowFn,
+  width: u32,       // The width of the output
+  height: u32,      // The height of the output
+  sample_rate: u32, // The sample rate of the wav data
+  data: Vec<i16>,   // Our raw wav data
+  window: WindowFn, // The windowing function to use.
+  verbose: bool,    // Do we print out stats and things
 }
 
 impl SpecOptionsBuilder {
@@ -76,6 +78,7 @@ impl SpecOptionsBuilder {
       sample_rate: 8000,
       data: vec![],
       window: utility::blackman_harris,
+      verbose: false,
     }
   }
 
@@ -98,9 +101,8 @@ impl SpecOptionsBuilder {
   ///
   ///  * `fname` - The path to the file.
   ///
-  pub fn load_data_from_file(&mut self, fname: &Path) -> &mut Self {
-    println!("Reading file: {:?}", fname);
-    let mut reader = hound::WavReader::open(fname).unwrap();
+  pub fn load_data_from_file(&mut self, fname: &Path) -> Result<&mut Self, SonogramError> {
+    let mut reader = hound::WavReader::open(fname)?;
 
     // Can only handle 16 bit data
     assert_eq!(reader.spec().bits_per_sample, 16);
@@ -114,7 +116,7 @@ impl SpecOptionsBuilder {
       .collect::<Vec<i16>>();
     let sample_rate = reader.spec().sample_rate;
 
-    self.load_data_from_memory(data, sample_rate)
+    Ok(self.load_data_from_memory(data, sample_rate))
   }
 
   /// Load data directly from memory.
@@ -127,10 +129,6 @@ impl SpecOptionsBuilder {
   pub fn load_data_from_memory(&mut self, data: Vec<i16>, sample_rate: u32) -> &mut Self {
     self.data = data;
     self.sample_rate = sample_rate;
-
-    let audio_length_sec = self.data.len() as u32 / self.sample_rate;
-    println!("Length (s): {}", audio_length_sec);
-
     self
   }
 
@@ -149,7 +147,7 @@ impl SpecOptionsBuilder {
     if divisor == 1 {
       return self;
     }
-    if self.data.len() == 0 {
+    if self.data.is_empty() {
       panic!("Need to load the data before calling this function");
     }
 
@@ -169,7 +167,11 @@ impl SpecOptionsBuilder {
     self.data.resize(self.data.len() / divisor, 0);
     self.sample_rate /= divisor as u32;
 
-    println!("New length is: {}", self.data.len());
+    self
+  }
+
+  pub fn set_verbose(&mut self) -> &mut Self {
+    self.verbose = true;
     self
   }
 
@@ -179,6 +181,11 @@ impl SpecOptionsBuilder {
   pub fn build(&self) -> Spectrograph {
     if self.data.is_empty() {
       panic!("SpecOptionsBuilder requires data to be loaded")
+    }
+
+    let audio_length_sec = self.data.len() as u32 / self.sample_rate;
+    if self.verbose {
+      println!("Length (s): {}", audio_length_sec);
     }
 
     let mut gradient = ColourGradient::new();
@@ -209,6 +216,7 @@ impl SpecOptionsBuilder {
       window: self.window,
       spectrogram: vec![vec![]],
       gradient,
+      verbose: self.verbose,
     }
   }
 }
@@ -223,11 +231,11 @@ impl SpecOptionsBuilder {
 ///
 /// ```Rust
 ///   let mut spectrograph = SpecOptionsBuilder::new(512, 128)
-///     .load_data_from_file(&std::path::Path::new(wav_file))
+///     .load_data_from_file(&std::path::Path::new(wav_file))?
 ///     .build();
 ///  
 ///   spectrograph.compute(2048, 0.8);
-///   spectrograph.save_as_png(&std::path::Path::new(png_file), false);
+///   spectrograph.save_as_png(&std::path::Path::new(png_file), false)?;
 /// ```
 ///
 pub struct Spectrograph {
@@ -237,6 +245,7 @@ pub struct Spectrograph {
   window: WindowFn,
   spectrogram: Spectrogram,
   gradient: ColourGradient,
+  verbose: bool,
 }
 
 impl Spectrograph {
@@ -269,15 +278,17 @@ impl Spectrograph {
     assert!(0.0 <= overlap && overlap < 1.0);
     let step = (chunk_len as f32 * (1.0 - overlap)) as usize;
 
-    // Print out computation info
-    println!("Computing spectrogram...");
-    println!(
-      "Chunk: {} Overlap: {}",
-      chunk_len,
-      overlap * chunk_len as f32
-    );
-    println!("Step len: {}", step);
-    println!("Data len: {}", self.data.len());
+    if self.verbose {
+      // Print out computation info
+      println!("Computing spectrogram...");
+      println!(
+        "Chunk: {} Overlap: {}",
+        chunk_len,
+        overlap * chunk_len as f32
+      );
+      println!("Step len: {}", step);
+      println!("Data len: {}", self.data.len());
+    }
 
     // Pad the data
     let mut new_len = 0;
@@ -301,7 +312,7 @@ impl Spectrograph {
   ///  * `fname` - The path to the PNG to save to the filesystem.
   ///  * `log_mode` - Apply the log function to the frequency scale.
   ///
-  pub fn save_as_png(&mut self, fname: &Path, log_mode: bool) {
+  pub fn save_as_png(&mut self, fname: &Path, log_mode: bool) -> Result<(), std::io::Error> {
     let data_len = self.spectrogram[0].len();
     // Only the data below 1/2 of the sampling rate (nyquist frequency)
     // is useful
@@ -313,20 +324,19 @@ impl Spectrograph {
 
     let log_coef = 1.0 / (self.height as f32 + 1.0).log(f32::consts::E) * img_len_used;
 
-    let file = File::create(fname).unwrap();
+    let file = File::create(fname)?;
     let w = &mut BufWriter::new(file);
 
     let mut encoder = png::Encoder::new(w, self.width, self.height);
     encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
-    let mut writer = encoder.write_header().unwrap();
+    let mut writer = encoder.write_header()?;
 
     let mut img: Vec<u8> = vec![];
 
     for y in (0..self.height).rev() {
       for x in 0..self.width {
         let freq = if log_mode {
-          img_len_used
-            - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
+          img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
         } else {
           let ratio = y as f32 / self.height as f32;
           ratio * img_len_used
@@ -336,8 +346,10 @@ impl Spectrograph {
         img.extend(colour.to_vec());
       }
     }
-    println!("Saving to file: {:?}", fname);
-    writer.write_image_data(&img).unwrap(); // Save
+
+    writer.write_image_data(&img)?; // Save
+
+    Ok(())
   }
 
   fn get_colour(&mut self, c: Complex<f32>, threshold: f32) -> RGBAColour {
@@ -363,9 +375,10 @@ impl Spectrograph {
     self.spectrogram.clear();
     self.spectrogram.reserve(self.width as usize);
 
-    println!("Computing chunks.");
     let num_chunks = self.get_number_of_chunks(chunk_len, step) as f32;
-    println!("Number of Chunks: {}", num_chunks);
+    if self.verbose {
+      println!("Number of Chunks: {}", num_chunks);
+    }
 
     let chunk_width_ratio = num_chunks / self.width as f32;
 

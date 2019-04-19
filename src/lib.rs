@@ -19,6 +19,12 @@
 
 extern crate png;
 
-pub mod colour_gradient;
-pub mod spectrograph;
-pub mod utility;
+mod colour_gradient;
+mod errors;
+mod spectrograph;
+mod utility;
+
+pub use colour_gradient::{ColourGradient, RGBAColour};
+pub use errors::SonogramError;
+pub use spectrograph::{SpecOptionsBuilder, Spectrograph};
+pub use utility::*;

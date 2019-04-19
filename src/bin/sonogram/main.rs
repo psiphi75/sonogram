@@ -19,7 +19,7 @@ extern crate clap;
 extern crate sonogram;
 
 use clap::{App, Arg};
-use sonogram::{spectrograph::SpecOptionsBuilder, utility};
+use sonogram::{blackman_harris, SpecOptionsBuilder};
 
 fn main() {
   let matches = App::new("sonogram")
@@ -50,13 +50,17 @@ fn main() {
   let png_file = matches.value_of("png").unwrap();
 
   let mut spectrograph = SpecOptionsBuilder::new(1024, 256)
-    .set_window_fn(utility::blackman_harris)
+    .set_verbose()
+    .set_window_fn(blackman_harris)
     .load_data_from_file(&std::path::Path::new(wav_file))
+    .unwrap()
     .downsample(2)
     .build();
 
   spectrograph.compute(2048, 0.8);
-  spectrograph.save_as_png(&std::path::Path::new(png_file), false);
+  spectrograph
+    .save_as_png(&std::path::Path::new(png_file), false)
+    .unwrap();
 
   ::std::process::exit(0);
 }

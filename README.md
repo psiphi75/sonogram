@@ -37,7 +37,7 @@ spectrograph.compute(2048, 0.8);
 
 // Save the spectrogram to PNG.
 let png_file = std::path::Path::new("path/to/file.png");
-spectrograph.save_as_png(&png_file, false);
+spectrograph.save_as_png(&png_file, false)?;
 
 ```
 
