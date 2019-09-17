@@ -58,6 +58,7 @@ pub struct SpecOptionsBuilder {
   sample_rate: u32, // The sample rate of the wav data
   data: Vec<i16>,   // Our raw wav data
   window: WindowFn, // The windowing function to use.
+  greyscale: bool,  // Is the output in greyscale
   verbose: bool,    // Do we print out stats and things
 }
 
@@ -78,6 +79,7 @@ impl SpecOptionsBuilder {
       sample_rate: 8000,
       data: vec![],
       window: utility::rectangular,
+      greyscale: false,
       verbose: false,
     }
   }
@@ -110,10 +112,7 @@ impl SpecOptionsBuilder {
     // TODO: We want to be able to handle multiple channels
     assert_eq!(reader.spec().channels, 1);
 
-    let data = reader
-      .samples::<i16>()
-      .map(|x| x.unwrap())
-      .collect::<Vec<i16>>();
+    let data = reader.samples().map(|x| x.unwrap()).collect();
     let sample_rate = reader.spec().sample_rate;
 
     Ok(self.load_data_from_memory(data, sample_rate))
@@ -175,6 +174,11 @@ impl SpecOptionsBuilder {
     self
   }
 
+  pub fn set_greyscale(&mut self) -> &mut Self {
+    self.greyscale = true;
+    self
+  }
+
   /// Last method to be called.  This will calculate the colour gradients and
   /// generate an instance of `Spectrograph`.
   ///
@@ -190,24 +194,29 @@ impl SpecOptionsBuilder {
 
     let mut gradient = ColourGradient::new();
 
-    // Colour for our plot
-    // Black
-    gradient.add_colour(RGBAColour::new(0, 0, 0, 0));
-    // Purple
-    gradient.add_colour(RGBAColour::new(55, 0, 110, 0));
-    // Blue
-    gradient.add_colour(RGBAColour::new(0, 0, 180, 0));
-    // Cyan
-    gradient.add_colour(RGBAColour::new(0, 255, 255, 0));
-    // Green
-    gradient.add_colour(RGBAColour::new(0, 255, 0, 0));
-    // Green Yellow
-    // Yellow
-    gradient.add_colour(RGBAColour::new(255, 255, 0, 0));
-    // Orange
-    gradient.add_colour(RGBAColour::new(230, 160, 0, 0));
-    // Red
-    gradient.add_colour(RGBAColour::new(255, 0, 0, 0));
+    if self.greyscale {
+      gradient.add_colour(RGBAColour::new(0, 0, 0, 0));
+      gradient.add_colour(RGBAColour::new(255, 255, 255, 0));
+    } else {
+      // Colour for our plot
+      // Black
+      gradient.add_colour(RGBAColour::new(0, 0, 0, 0));
+      // Purple
+      gradient.add_colour(RGBAColour::new(55, 0, 110, 0));
+      // Blue
+      gradient.add_colour(RGBAColour::new(0, 0, 180, 0));
+      // Cyan
+      gradient.add_colour(RGBAColour::new(0, 255, 255, 0));
+      // Green
+      gradient.add_colour(RGBAColour::new(0, 255, 0, 0));
+      // Green Yellow
+      // Yellow
+      gradient.add_colour(RGBAColour::new(255, 255, 0, 0));
+      // Orange
+      gradient.add_colour(RGBAColour::new(230, 160, 0, 0));
+      // Red
+      gradient.add_colour(RGBAColour::new(255, 0, 0, 0));
+    }
 
     Spectrograph {
       width: self.width,

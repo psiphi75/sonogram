@@ -100,6 +100,12 @@ fn main() {
         .takes_value(true),
     )
     .arg(
+      Arg::with_name("greyscale")
+        .long("greyscale")
+        .help("Output png as greyscale")
+        .takes_value(false),
+    )
+    .arg(
       Arg::with_name("quiet")
         .short("q")
         .long("quiet")
@@ -151,6 +157,7 @@ fn main() {
     }
     Err(_) => panic!(STR_ERR_OVERLAP),
   };
+  let greyscale = matches.is_present("greyscale");
   let quiet = !matches.is_present("quiet");
 
   //
@@ -159,6 +166,9 @@ fn main() {
   let mut spec_builder = SpecOptionsBuilder::new(width, height);
   if quiet {
     spec_builder.set_verbose();
+  }
+  if greyscale {
+    spec_builder.set_greyscale();
   }
   spec_builder
     .set_window_fn(window_fn)
