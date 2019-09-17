@@ -77,7 +77,7 @@ impl SpecOptionsBuilder {
       height,
       sample_rate: 8000,
       data: vec![],
-      window: utility::blackman_harris,
+      window: utility::rectangular,
       verbose: false,
     }
   }

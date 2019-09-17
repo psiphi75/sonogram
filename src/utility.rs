@@ -31,6 +31,10 @@ pub fn reverse_bits(val: usize, power: usize) -> usize {
   reversed
 }
 
+pub fn rectangular(_n: u32, _samples: u32) -> f32 {
+  1.0
+}
+
 pub fn hann_function(n: u32, samples: u32) -> f32 {
   0.5 * (1.0 - f32::cos((2.0 * PI * n as f32) / (samples as f32 - 1.0)))
 }
