@@ -361,6 +361,53 @@ impl Spectrograph {
     Ok(())
   }
 
+  ///
+  /// Save the calculated spectrogram as a CSV file.
+  ///
+  /// # Arguments
+  ///
+  ///  * `fname` - The path to the CSV to save to the filesystem.
+  ///  * `log_mode` - Apply the log function to the frequency scale.
+  ///
+  pub fn save_as_csv(&mut self, fname: &Path, log_mode: bool) -> Result<(), std::io::Error> {
+    let data_len = self.spectrogram[0].len();
+    // Only the data below 1/2 of the sampling rate (nyquist frequency)
+    // is useful
+    let multiplier = 0.5;
+    let img_len_used = data_len as f32 * multiplier;
+
+    let log_coef = 1.0 / (self.height as f32 + 1.0).log(f32::consts::E) * img_len_used;
+
+    let mut writer = csv::Writer::from_path(fname)?;
+
+    // Create the CSV header
+    let mut csv_record: Vec<String> = (0..self.width).into_iter().map(|x| x.to_string()).collect();
+    writer.write_record(&csv_record)?;
+
+    for y in (0..self.height).rev() {
+      for x in 0..self.width {
+        let freq = if log_mode {
+          img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
+        } else {
+          let ratio = y as f32 / self.height as f32;
+          ratio * img_len_used
+        };
+
+        let value = self.get_real(self.spectrogram[x as usize][freq as usize]);
+        csv_record[x as usize] = value.to_string();
+      }
+      writer.write_record(&csv_record)?;
+    }
+
+    writer.flush()?; // Save
+
+    Ok(())
+  }
+
+  fn get_real(&mut self, c: Complex<f32>) -> f32 {
+    0.5 * (c.norm_sqr() + 1.0).log10()
+  }
+
   fn get_colour(&mut self, c: Complex<f32>, threshold: f32) -> RGBAColour {
     let value = 0.5 * (c.norm_sqr() + 1.0).log10();
     self.gradient.set_max(threshold);

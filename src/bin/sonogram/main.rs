@@ -45,7 +45,16 @@ fn main() {
         .long("png")
         .value_name("FILE")
         .help("The output PNG file")
-        .required(true)
+        .required(false)
+        .takes_value(true),
+    )
+    .arg(
+      Arg::with_name("csv")
+        .short("c")
+        .long("csv")
+        .value_name("FILE")
+        .help("The output CSV file")
+        .required(false)
         .takes_value(true),
     )
     .arg(
@@ -84,8 +93,8 @@ fn main() {
         .takes_value(true),
     )
     .arg(
-      Arg::with_name("chunk_len")
-        .long("chunk_len")
+      Arg::with_name("chunk-len")
+        .long("chunk-len")
         .value_name("CHUNK_LEN")
         .help("The length of each audio chunk to process, in samples")
         .default_value("2048")
@@ -118,7 +127,11 @@ fn main() {
   // Get the cli options
   //
   let wav_file = matches.value_of("wav").unwrap();
-  let png_file = matches.value_of("png").unwrap();
+
+  if !matches.is_present("png") && !matches.is_present("csv") {
+    panic!("Need to provide either a CSV or PNG output");
+  }
+
   let downsample = match matches.value_of("downsample").unwrap().parse::<usize>() {
     Ok(n) => n,
     Err(_) => panic!("Invalid downsample value, it must be an integer greater than 1"),
@@ -137,7 +150,7 @@ fn main() {
     "hann" => sonogram::hann_function,
     _ => panic!("Invalid window function"),
   };
-  let chunk_len = match matches.value_of("chunk_len").unwrap().parse::<usize>() {
+  let chunk_len = match matches.value_of("chunk-len").unwrap().parse::<usize>() {
     Ok(n) => {
       if n <= 16 {
         panic!(STR_ERR_CHUNK_LEN)
@@ -182,9 +195,19 @@ fn main() {
   // Do the spectrograph
   //
   spectrograph.compute(chunk_len, overlap);
-  spectrograph
-    .save_as_png(&std::path::Path::new(png_file), false)
-    .unwrap();
+
+  if matches.is_present("png") {
+    let png_file = matches.value_of("png").unwrap();
+    spectrograph
+      .save_as_png(&std::path::Path::new(png_file), false)
+      .unwrap()
+  }
+  if matches.is_present("csv") {
+    let csv_file = matches.value_of("csv").unwrap();
+    spectrograph
+      .save_as_csv(&std::path::Path::new(csv_file), false)
+      .unwrap()
+  }
 
   ::std::process::exit(0);
 }

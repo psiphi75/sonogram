@@ -18,6 +18,7 @@
  */
 
 extern crate png;
+extern crate csv;
 
 mod colour_gradient;
 mod errors;
