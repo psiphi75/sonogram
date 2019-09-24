@@ -319,9 +319,9 @@ impl Spectrograph {
   /// # Arguments
   ///
   ///  * `fname` - The path to the PNG to save to the filesystem.
-  ///  * `log_mode` - Apply the log function to the frequency scale.
+  ///  * `log_freq` - Apply the log function to the frequency scale.
   ///
-  pub fn save_as_png(&mut self, fname: &Path, log_mode: bool) -> Result<(), std::io::Error> {
+  pub fn save_as_png(&mut self, fname: &Path, log_freq: bool) -> Result<(), std::io::Error> {
     let data_len = self.spectrogram[0].len();
     // Only the data below 1/2 of the sampling rate (nyquist frequency)
     // is useful
@@ -344,7 +344,7 @@ impl Spectrograph {
 
     for y in (0..self.height).rev() {
       for x in 0..self.width {
-        let freq = if log_mode {
+        let freq = if log_freq {
           img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
         } else {
           let ratio = y as f32 / self.height as f32;
@@ -367,9 +367,9 @@ impl Spectrograph {
   /// # Arguments
   ///
   ///  * `fname` - The path to the CSV to save to the filesystem.
-  ///  * `log_mode` - Apply the log function to the frequency scale.
+  ///  * `log_freq` - Apply the log function to the frequency scale.
   ///
-  pub fn save_as_csv(&mut self, fname: &Path, log_mode: bool) -> Result<(), std::io::Error> {
+  pub fn save_as_csv(&mut self, fname: &Path, log_freq: bool) -> Result<(), std::io::Error> {
     let data_len = self.spectrogram[0].len();
     // Only the data below 1/2 of the sampling rate (nyquist frequency)
     // is useful
@@ -386,7 +386,7 @@ impl Spectrograph {
 
     for y in (0..self.height).rev() {
       for x in 0..self.width {
-        let freq = if log_mode {
+        let freq = if log_freq {
           img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
         } else {
           let ratio = y as f32 / self.height as f32;
@@ -404,12 +404,47 @@ impl Spectrograph {
     Ok(())
   }
 
+  ///
+  /// Create the spectrogram in memory.
+  ///
+  /// # Arguments
+  ///
+  ///  * `log_freq` - Apply the log function to the frequency scale.
+  ///
+  pub fn create_in_memory(&mut self, log_freq: bool) -> Vec<f32> {
+    let data_len = self.spectrogram[0].len();
+    // Only the data below 1/2 of the sampling rate (nyquist frequency)
+    // is useful
+    let multiplier = 0.5;
+    let img_len_used = data_len as f32 * multiplier;
+
+    let log_coef = 1.0 / (self.height as f32 + 1.0).log(f32::consts::E) * img_len_used;
+
+    let mut result = Vec::with_capacity((self.height * self.width) as usize);
+
+    for y in (0..self.height).rev() {
+      for x in 0..self.width {
+        let freq = if log_freq {
+          img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
+        } else {
+          let ratio = y as f32 / self.height as f32;
+          ratio * img_len_used
+        };
+
+        let value = self.get_real(self.spectrogram[x as usize][freq as usize]);
+        result.push(value)
+      }
+    }
+
+    result
+  }
+
   fn get_real(&mut self, c: Complex<f32>) -> f32 {
     0.5 * (c.norm_sqr() + 1.0).log10()
   }
 
   fn get_colour(&mut self, c: Complex<f32>, threshold: f32) -> RGBAColour {
-    let value = 0.5 * (c.norm_sqr() + 1.0).log10();
+    let value = self.get_real(c);
     self.gradient.set_max(threshold);
     self.gradient.get_colour(value).clone()
   }
