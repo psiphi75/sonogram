@@ -24,6 +24,7 @@ use sonogram::SpecOptionsBuilder;
 const STR_ERR_OVERLAP: &str =
   "Invalid overlap value, it must be an real value greater than 0.0 and less than 0.9";
 const STR_ERR_CHUNK_LEN: &str = "Invalid chunk_len value, it must be an integer greater than 16";
+const STR_ERR_SCALE_RANGE: &str = "Scale value is out of range.";
 
 fn main() {
   let matches = App::new("sonogram")
@@ -115,6 +116,13 @@ fn main() {
         .takes_value(false),
     )
     .arg(
+      Arg::with_name("scale")
+        .long("scale")
+        .help("Scale the wav values by factor before computing spectrogram")
+        .default_value("1.0")
+        .takes_value(true),
+    )
+    .arg(
       Arg::with_name("quiet")
         .short("q")
         .long("quiet")
@@ -170,6 +178,16 @@ fn main() {
     }
     Err(_) => panic!(STR_ERR_OVERLAP),
   };
+  let scale = match matches.value_of("scale").unwrap().parse::<f32>() {
+    Ok(n) => {
+      if !(0.0001 <= n && n < 1000.0) {
+        panic!(STR_ERR_SCALE_RANGE)
+      } else {
+        n
+      }
+    }
+    Err(_) => panic!(STR_ERR_SCALE_RANGE),
+  };
   let greyscale = matches.is_present("greyscale");
   let quiet = !matches.is_present("quiet");
 
@@ -187,7 +205,8 @@ fn main() {
     .set_window_fn(window_fn)
     .load_data_from_file(&std::path::Path::new(wav_file))
     .unwrap()
-    .downsample(downsample);
+    .downsample(downsample)
+    .scale(scale);
 
   let mut spectrograph = spec_builder.build();
 

@@ -147,7 +147,7 @@ impl SpecOptionsBuilder {
       return self;
     }
     if self.data.is_empty() {
-      panic!("Need to load the data before calling this function");
+      panic!("Need to load the data before calling downsample");
     }
 
     let mut j = 0;
@@ -176,6 +176,23 @@ impl SpecOptionsBuilder {
 
   pub fn set_greyscale(&mut self) -> &mut Self {
     self.greyscale = true;
+    self
+  }
+
+  pub fn scale(&mut self, scale_factor: f32) -> &mut Self {
+    if self.data.is_empty() {
+      panic!("Need to load the data before calling scale");
+    }
+
+    // Don't need to scale 1.0
+    if scale_factor == 1.0 {
+      return self;
+    }
+
+    for i in 0..self.data.len() {
+      self.data[i] = (self.data[i] as f32 * scale_factor) as i16;
+    }
+
     self
   }
 
