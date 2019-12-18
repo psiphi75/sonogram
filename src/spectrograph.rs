@@ -56,7 +56,7 @@ pub struct SpecOptionsBuilder {
   width: u32,       // The width of the output
   height: u32,      // The height of the output
   sample_rate: u32, // The sample rate of the wav data
-  data: Vec<i16>,   // Our raw wav data
+  data: Vec<f32>,   // Our raw wav data
   window: WindowFn, // The windowing function to use.
   greyscale: bool,  // Is the output in greyscale
   verbose: bool,    // Do we print out stats and things
@@ -118,7 +118,7 @@ impl SpecOptionsBuilder {
     Ok(self.load_data_from_memory(data, sample_rate))
   }
 
-  /// Load data directly from memory.
+  /// Load data directly from memory - i16 version.
   ///
   /// # Arguments
   ///
@@ -126,6 +126,19 @@ impl SpecOptionsBuilder {
   ///  * `sample_rate` - The sample rate, in Hz, of the data.
   ///
   pub fn load_data_from_memory(&mut self, data: Vec<i16>, sample_rate: u32) -> &mut Self {
+    self.data = data.iter().map(|&x| x as f32).collect();
+    self.sample_rate = sample_rate;
+    self
+  }
+
+  /// Load data directly from memory - f32 version.
+  ///
+  /// # Arguments
+  ///
+  ///  * `data` - The raw wavform data that will be converted to a spectrogram.
+  ///  * `sample_rate` - The sample rate, in Hz, of the data.
+  ///
+  pub fn load_data_from_memory_f32(&mut self, data: Vec<f32>, sample_rate: u32) -> &mut Self {
     self.data = data;
     self.sample_rate = sample_rate;
     self
@@ -152,18 +165,16 @@ impl SpecOptionsBuilder {
 
     let mut j = 0;
     for i in (0..self.data.len() - divisor).step_by(divisor) {
-      let sum: i32 = self.data[i..i + divisor]
-        .iter()
-        .fold(0i32, |mut sum, &val| {
-          sum += i32::from(val);
-          sum
-        });
-      let avg = sum / divisor as i32;
+      let sum: f32 = self.data[i..i + divisor].iter().fold(0.0, |mut sum, &val| {
+        sum += val;
+        sum
+      });
+      let avg = sum / (divisor as f32);
 
-      self.data[j] = avg as i16;
+      self.data[j] = avg;
       j += 1;
     }
-    self.data.resize(self.data.len() / divisor, 0);
+    self.data.resize(self.data.len() / divisor, 0.0);
     self.sample_rate /= divisor as u32;
 
     self
@@ -190,7 +201,7 @@ impl SpecOptionsBuilder {
     }
 
     for i in 0..self.data.len() {
-      self.data[i] = (self.data[i] as f32 * scale_factor) as i16;
+      self.data[i] = self.data[i] * scale_factor;
     }
 
     self
@@ -267,7 +278,7 @@ impl SpecOptionsBuilder {
 pub struct Spectrograph {
   width: u32,
   height: u32,
-  data: Vec<i16>,
+  data: Vec<f32>,
   window: WindowFn,
   spectrogram: Spectrogram,
   gradient: ColourGradient,
@@ -280,15 +291,6 @@ impl Spectrograph {
 
     // VVV Comment out this line to use the cache VVVV
     Complex::new(f32::cos(trig_arg), f32::sin(trig_arg))
-
-    // auto memo = omega_cache_.find(trig_arg);
-    // if (memo != omega_cache_.end()){
-    //     return memo->second;
-    // } else {
-    //     complex_d result = { cos(trig_arg), sin(trig_arg) };
-    //     omega_cache_[trig_arg] = result;
-    //     return result;
-    // }
   }
 
   ///
@@ -323,7 +325,7 @@ impl Spectrograph {
     }
     if new_len != self.data.len() {
       new_len += chunk_len;
-      let padding = &mut vec![0; new_len - self.data.len()];
+      let padding = &mut vec![0.0; new_len - self.data.len()];
       self.data.append(padding);
     }
 
@@ -343,9 +345,6 @@ impl Spectrograph {
     // Only the data below 1/2 of the sampling rate (nyquist frequency)
     // is useful
     let multiplier = 0.5;
-    // for (int i = 1; i < file_handle_.channels(); i++){
-    //     multiplier *= 0.5;
-    // }
     let img_len_used = data_len as f32 * multiplier;
 
     let log_coef = 1.0 / (self.height as f32 + 1.0).log(f32::consts::E) * img_len_used;
@@ -529,7 +528,6 @@ impl Spectrograph {
       let mut i = 0;
       while i <= transformed.len() - n {
         // Combine each half of the segment
-
         for m in i..(i + n / 2) {
           let term1 = transformed[m];
           let term2 = self.omega(n as f32, -(m as f32)) * transformed[m + n / 2];

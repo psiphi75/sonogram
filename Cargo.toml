@@ -1,7 +1,7 @@
 [package]
 name = "sonogram"
 description = "A spectrograph utility written in Rust"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["Simon M. Werner <simonwerner@gmail.com>"]
 license = "GPL-3.0-or-later"
 readme = "README.md"
