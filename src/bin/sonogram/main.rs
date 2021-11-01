@@ -62,16 +62,26 @@ fn main() {
       Arg::with_name("downsample")
         .short("d")
         .long("downsample")
-        .value_name("DOWNSAMPLE")
+        .value_name("NUM")
         .help("Downsample the .wav by this factor")
         .default_value("1")
+        .takes_value(true),
+    )
+    .arg(
+      Arg::with_name("channel")
+        .short("n")
+        .long("channel")
+        .value_name("NUM")
+        .help("The audio channel")
+        .default_value("1")
+        .required(false)
         .takes_value(true),
     )
     .arg(
       Arg::with_name("window-function")
         .short("f")
         .long("window-function")
-        .value_name("FUNCTION NAME")
+        .value_name("FUNC NAME")
         .help("The windowing function to use")
         .possible_values(&["blackman_harris", "rectangular", "hann"])
         .default_value("rectangular")
@@ -80,7 +90,7 @@ fn main() {
     .arg(
       Arg::with_name("width")
         .long("width")
-        .value_name("WIDTH PIXELS")
+        .value_name("PIXELS")
         .help("The width of the output in pixels")
         .default_value("256")
         .takes_value(true),
@@ -88,7 +98,7 @@ fn main() {
     .arg(
       Arg::with_name("height")
         .long("height")
-        .value_name("HEIGHT PIXELS")
+        .value_name("PIXELS")
         .help("The height of the output in pixels")
         .default_value("256")
         .takes_value(true),
@@ -96,7 +106,7 @@ fn main() {
     .arg(
       Arg::with_name("chunk-len")
         .long("chunk-len")
-        .value_name("CHUNK_LEN")
+        .value_name("NUM")
         .help("The length of each audio chunk to process, in samples")
         .default_value("2048")
         .takes_value(true),
@@ -118,6 +128,7 @@ fn main() {
     .arg(
       Arg::with_name("scale")
         .long("scale")
+        .value_name("SCALE")
         .help("Scale the wav values by factor before computing spectrogram")
         .default_value("1.0")
         .takes_value(true),
@@ -144,6 +155,10 @@ fn main() {
     Ok(n) => n,
     Err(_) => panic!("Invalid downsample value, it must be an integer greater than 1"),
   };
+  let channel = match matches.value_of("channel").unwrap().parse::<u16>() {
+    Ok(n) => n,
+    Err(_) => panic!("Invalid channel value, it must be an integer greater than 1"),
+  };
   let width = match matches.value_of("width").unwrap().parse::<u32>() {
     Ok(n) => n,
     Err(_) => panic!("Invalid width value, it must be an integer greater than 1"),
@@ -161,32 +176,32 @@ fn main() {
   let chunk_len = match matches.value_of("chunk-len").unwrap().parse::<usize>() {
     Ok(n) => {
       if n <= 16 {
-        panic!(STR_ERR_CHUNK_LEN)
+        panic!("{}", STR_ERR_CHUNK_LEN)
       } else {
         n
       }
     }
-    Err(_) => panic!(STR_ERR_CHUNK_LEN),
+    Err(_) => panic!("{}", STR_ERR_CHUNK_LEN),
   };
   let overlap = match matches.value_of("overlap").unwrap().parse::<f32>() {
     Ok(n) => {
       if !(0.0 <= n || n < 0.9) {
-        panic!(STR_ERR_OVERLAP)
+        panic!("{}", STR_ERR_OVERLAP)
       } else {
         n
       }
     }
-    Err(_) => panic!(STR_ERR_OVERLAP),
+    Err(_) => panic!("{}", STR_ERR_OVERLAP),
   };
   let scale = match matches.value_of("scale").unwrap().parse::<f32>() {
     Ok(n) => {
       if !(0.0001 <= n && n < 1000.0) {
-        panic!(STR_ERR_SCALE_RANGE)
+        panic!("{}", STR_ERR_SCALE_RANGE)
       } else {
         n
       }
     }
-    Err(_) => panic!(STR_ERR_SCALE_RANGE),
+    Err(_) => panic!("{}", STR_ERR_SCALE_RANGE),
   };
   let greyscale = matches.is_present("greyscale");
   let quiet = !matches.is_present("quiet");
@@ -203,6 +218,7 @@ fn main() {
   }
   spec_builder
     .set_window_fn(window_fn)
+    .channel(channel)
     .load_data_from_file(&std::path::Path::new(wav_file))
     .unwrap()
     .downsample(downsample)

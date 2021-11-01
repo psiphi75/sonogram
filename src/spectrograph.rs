@@ -39,10 +39,6 @@ type WindowFn = fn(u32, u32) -> f32;
 /// at a minimum.  However you can load data from a .wav file, or directly
 /// from a Vec<i16> memory object.
 ///
-/// # Limitations
-///  
-///  - Currently the builder only allows for one channel of audio.
-///
 /// # Example
 ///
 /// ```Rust
@@ -57,6 +53,7 @@ pub struct SpecOptionsBuilder {
   height: u32,      // The height of the output
   sample_rate: u32, // The sample rate of the wav data
   data: Vec<f32>,   // Our raw wav data
+  channel: u16,     // The audio channel
   window: WindowFn, // The windowing function to use.
   greyscale: bool,  // Is the output in greyscale
   verbose: bool,    // Do we print out stats and things
@@ -78,6 +75,7 @@ impl SpecOptionsBuilder {
       height,
       sample_rate: 8000,
       data: vec![],
+      channel: 1,
       window: utility::rectangular,
       greyscale: false,
       verbose: false,
@@ -107,12 +105,29 @@ impl SpecOptionsBuilder {
     let mut reader = hound::WavReader::open(fname)?;
 
     // Can only handle 16 bit data
-    assert_eq!(reader.spec().bits_per_sample, 16);
+    // TODO: Add more data here
+    if 16 != reader.spec().bits_per_sample {
+      panic!("Currently we can only handle 16 bits per sample in the audio source.");
+    }
 
-    // TODO: We want to be able to handle multiple channels
-    assert_eq!(reader.spec().channels, 1);
+    if self.channel > reader.spec().channels {
+      panic!("Channel set to {}, but the audio on has {} channel(s)", self.channel, reader.spec().channels);
+    }
 
-    let data = reader.samples().map(|x| x.unwrap()).collect();
+    let data: Vec<i16> = {
+      let first_sample = self.channel as usize - 1;
+      let step_size = reader.spec().channels as usize;
+      let mut s = reader.samples();
+
+      // TODO: replace this with .advanced_by in the future
+      for _ in 0..first_sample {
+        s.next();
+      }
+
+      s.step_by(step_size)
+        .map(|x| x.unwrap())
+        .collect()
+    };
     let sample_rate = reader.spec().sample_rate;
 
     Ok(self.load_data_from_memory(data, sample_rate))
@@ -177,6 +192,14 @@ impl SpecOptionsBuilder {
     self.data.resize(self.data.len() / divisor, 0.0);
     self.sample_rate /= divisor as u32;
 
+    self
+  }
+
+  pub fn channel(&mut self, channel: u16) -> &mut Self {
+    if channel == 0 {
+      panic!("The channel must be an integer 1 or greater");
+    }
+    self.channel = channel;
     self
   }
 
