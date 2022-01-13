@@ -41,6 +41,19 @@ spectrograph.save_as_png(&png_file, false)?;
 
 ```
 
+## Using your own colour gradient
+
+```Rust
+let mut gradient = ColourGradient::new();
+gradient.add_colour(RGBAColour::new(0, 0, 0, 255));     // Black
+gradient.add_colour(RGBAColour::new(55, 0, 110, 255));  // Purple
+gradient.add_colour(RGBAColour::new(0, 0, 180, 255));   // Blue
+gradient.add_colour(RGBAColour::new(0, 255, 255, 255)); // Cyan
+gradient.add_colour(RGBAColour::new(0, 255, 0, 255));   // Green
+spec_builder.set_gradient(gradient);
+```
+
+
 ## License
 
 The code in this repository is based on the [C++ code developed by

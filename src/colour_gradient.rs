@@ -18,7 +18,7 @@
  */
 
 /// Colours required for a PNG file, includes the alpha channel.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct RGBAColour {
   r: u8,
   g: u8,
@@ -38,6 +38,7 @@ impl RGBAColour {
 
 /// ColourGradient allows you to create custom colour gradients for each
 /// PNG created.
+#[derive(Clone, Debug)]
 pub struct ColourGradient {
   colours: Vec<RGBAColour>,
   min: f32,
@@ -55,34 +56,30 @@ impl ColourGradient {
 
   pub fn get_colour(&self, value: f32) -> RGBAColour {
     assert!(self.colours.len() > 1);
+    assert!(self.max >= self.min);
 
     if value >= self.max {
       return self.colours.last().unwrap().clone();
     }
-    let mut ratio = value / self.max;
-    let width = 1.0 / (self.colours.len() as f32 - 1.0);
-    let mut i = 0;
-
-    // Find the "bin"
-    while ratio > width {
-      ratio -= width;
-      i += 1;
+    if value <= self.min {
+      return self.colours.first().unwrap().clone();
     }
 
-    ratio *= (self.colours.len() - 1) as f32;
+    // Get the scaled values and indexes to lookup the colour
+    let range = self.max - self.min;
+    let scaled_value = value / range * (self.colours.len() as f32 - 1.0);
+    let idx_value = scaled_value.floor() as usize;
+    let ratio = scaled_value - idx_value as f32;
 
-    assert!(0.0 <= ratio);
-    assert!(ratio <= 1.0);
-    assert!(i < self.colours.len());
-
-    let first = self.colours[i].clone();
-    let second = self.colours[i + 1].clone();
+    // Get the colour band
+    let first = self.colours[idx_value].clone();
+    let second = self.colours[idx_value + 1].clone();
 
     RGBAColour {
       r: self.interpolate(first.r, second.r, ratio),
       g: self.interpolate(first.g, second.g, ratio),
       b: self.interpolate(first.b, second.b, ratio),
-      a: 255,
+      a: self.interpolate(first.a, second.a, ratio),
     }
   }
 
@@ -101,4 +98,35 @@ impl ColourGradient {
   pub fn set_min(&mut self, min: f32) {
     self.min = min
   }
+}
+
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn get_colour() {
+    let mut gradient = ColourGradient::new();
+
+    gradient.add_colour(RGBAColour::new(0, 0, 0, 255));
+    gradient.add_colour(RGBAColour::new(255, 255, 255, 255));
+    gradient.set_min(0.0);
+    gradient.set_max(1.0);
+
+    // Test two colours
+    assert_eq!(gradient.get_colour(0.0), RGBAColour::new(0, 0, 0, 255));
+    assert_eq!(gradient.get_colour(1.0), RGBAColour::new(255, 255, 255, 255));
+    assert_eq!(gradient.get_colour(0.5), RGBAColour::new(128, 128, 128, 255));
+
+    // Test three colours
+    gradient.add_colour(RGBAColour::new(0, 0, 0, 255));
+    assert_eq!(gradient.get_colour(0.0), RGBAColour::new(0, 0, 0, 255));
+    assert_eq!(gradient.get_colour(1.0), RGBAColour::new(0, 0, 0, 255));
+    assert_eq!(gradient.get_colour(0.5), RGBAColour::new(255, 255, 255, 255));
+    assert_eq!(gradient.get_colour(0.125), RGBAColour::new(64, 64, 64, 255));
+    assert_eq!(gradient.get_colour(0.25), RGBAColour::new(128, 128, 128, 255));
+    assert_eq!(gradient.get_colour(0.75), RGBAColour::new(128, 128, 128, 255));
+  }
+
 }

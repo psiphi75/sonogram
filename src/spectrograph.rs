@@ -57,6 +57,7 @@ pub struct SpecOptionsBuilder {
   window: WindowFn, // The windowing function to use.
   greyscale: bool,  // Is the output in greyscale
   verbose: bool,    // Do we print out stats and things
+  gradient: Option<ColourGradient>, // User defined colour gradient
 }
 
 impl SpecOptionsBuilder {
@@ -79,6 +80,7 @@ impl SpecOptionsBuilder {
       window: utility::rectangular,
       greyscale: false,
       verbose: false,
+      gradient: None,
     }
   }
 
@@ -213,6 +215,11 @@ impl SpecOptionsBuilder {
     self
   }
 
+  pub fn set_gradient(&mut self, gradient: ColourGradient) -> &mut Self {
+    self.gradient = Some(gradient);
+    self
+  }
+
   pub fn scale(&mut self, scale_factor: f32) -> &mut Self {
     if self.data.is_empty() {
       panic!("Need to load the data before calling scale");
@@ -243,31 +250,26 @@ impl SpecOptionsBuilder {
       println!("Length (s): {}", audio_length_sec);
     }
 
-    let mut gradient = ColourGradient::new();
-
-    if self.greyscale {
-      gradient.add_colour(RGBAColour::new(0, 0, 0, 0));
-      gradient.add_colour(RGBAColour::new(255, 255, 255, 0));
+    // Override the colour gradient if one is set
+    let gradient = if self.greyscale {
+      let mut gradient = ColourGradient::new();
+      gradient.add_colour(RGBAColour::new(0, 0, 0, 255));
+      gradient.add_colour(RGBAColour::new(255, 255, 255, 255));
+      gradient
     } else {
-      // Colour for our plot
-      // Black
-      gradient.add_colour(RGBAColour::new(0, 0, 0, 0));
-      // Purple
-      gradient.add_colour(RGBAColour::new(55, 0, 110, 0));
-      // Blue
-      gradient.add_colour(RGBAColour::new(0, 0, 180, 0));
-      // Cyan
-      gradient.add_colour(RGBAColour::new(0, 255, 255, 0));
-      // Green
-      gradient.add_colour(RGBAColour::new(0, 255, 0, 0));
-      // Green Yellow
-      // Yellow
-      gradient.add_colour(RGBAColour::new(255, 255, 0, 0));
-      // Orange
-      gradient.add_colour(RGBAColour::new(230, 160, 0, 0));
-      // Red
-      gradient.add_colour(RGBAColour::new(255, 0, 0, 0));
-    }
+      match &self.gradient {
+        None => {
+          let mut gradient = ColourGradient::new();
+          gradient.add_colour(RGBAColour::new(0, 0, 0, 255));// Black
+          gradient.add_colour(RGBAColour::new(55, 0, 110, 255));// Purple
+          gradient.add_colour(RGBAColour::new(0, 0, 180, 255));// Blue
+          gradient.add_colour(RGBAColour::new(0, 255, 255, 255));// Cyan
+          gradient.add_colour(RGBAColour::new(0, 255, 0, 255));// Green
+          gradient
+        },
+        Some(gradient) => gradient.clone()
+      }
+    };
 
     Spectrograph {
       width: self.width,
@@ -390,7 +392,7 @@ impl Spectrograph {
           ratio * img_len_used
         };
 
-        let colour = self.get_colour(self.spectrogram[x as usize][freq as usize], 15.0);
+        let colour = self.get_colour(self.spectrogram[x as usize][freq as usize]);
         img.extend(colour.to_vec());
       }
     }
@@ -482,9 +484,8 @@ impl Spectrograph {
     0.5 * (c.norm_sqr() + 1.0).log10()
   }
 
-  fn get_colour(&mut self, c: Complex<f32>, threshold: f32) -> RGBAColour {
+  fn get_colour(&mut self, c: Complex<f32>) -> RGBAColour {
     let value = self.get_real(c);
-    self.gradient.set_max(threshold);
     self.gradient.get_colour(value).clone()
   }
 

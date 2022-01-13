@@ -19,7 +19,7 @@ extern crate clap;
 extern crate sonogram;
 
 use clap::{App, Arg};
-use sonogram::SpecOptionsBuilder;
+use sonogram::{SpecOptionsBuilder, ColourGradient, RGBAColour};
 
 const STR_ERR_OVERLAP: &str =
   "Invalid overlap value, it must be an real value greater than 0.0 and less than 0.9";
@@ -195,7 +195,7 @@ fn main() {
   };
   let scale = match matches.value_of("scale").unwrap().parse::<f32>() {
     Ok(n) => {
-      if !(0.0001 <= n && n < 1000.0) {
+      if !(0.000001 <= n && n < 100000.0) {
         panic!("{}", STR_ERR_SCALE_RANGE)
       } else {
         n
@@ -215,7 +215,17 @@ fn main() {
   }
   if greyscale {
     spec_builder.set_greyscale();
+  } else {
+    // Colour for our plot
+    let mut gradient = ColourGradient::new();
+    gradient.add_colour(RGBAColour::new(0, 0, 0, 255));// Black
+    gradient.add_colour(RGBAColour::new(55, 0, 110, 255));// Purple
+    gradient.add_colour(RGBAColour::new(0, 0, 180, 255));// Blue
+    gradient.add_colour(RGBAColour::new(0, 255, 255, 255));// Cyan
+    gradient.add_colour(RGBAColour::new(0, 255, 0, 255));// Green
+    spec_builder.set_gradient(gradient);
   }
+
   spec_builder
     .set_window_fn(window_fn)
     .channel(channel)
