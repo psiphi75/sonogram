@@ -195,7 +195,7 @@ fn main() {
   };
   let scale = match matches.value_of("scale").unwrap().parse::<f32>() {
     Ok(n) => {
-      if !(0.000001 <= n && n < 100000.0) {
+      if !(0.000001..100000.0).contains(&n) {
         panic!("{}", STR_ERR_SCALE_RANGE)
       } else {
         n
@@ -229,7 +229,7 @@ fn main() {
   spec_builder
     .set_window_fn(window_fn)
     .channel(channel)
-    .load_data_from_file(&std::path::Path::new(wav_file))
+    .load_data_from_file(std::path::Path::new(wav_file))
     .unwrap()
     .downsample(downsample)
     .scale(scale);
@@ -244,13 +244,13 @@ fn main() {
   if matches.is_present("png") {
     let png_file = matches.value_of("png").unwrap();
     spectrograph
-      .save_as_png(&std::path::Path::new(png_file), false)
+      .save_as_png(std::path::Path::new(png_file), false)
       .unwrap()
   }
   if matches.is_present("csv") {
     let csv_file = matches.value_of("csv").unwrap();
     spectrograph
-      .save_as_csv(&std::path::Path::new(csv_file), false)
+      .save_as_csv(std::path::Path::new(csv_file), false)
       .unwrap()
   }
 

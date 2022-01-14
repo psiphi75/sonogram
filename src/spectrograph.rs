@@ -23,7 +23,6 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 
-use hound;
 use png::HasParameters; // To use encoder.set()
 
 use crate::colour_gradient::{ColourGradient, RGBAColour};
@@ -182,8 +181,7 @@ impl SpecOptionsBuilder {
       panic!("Need to load the data before calling downsample");
     }
 
-    let mut j = 0;
-    for i in (0..self.data.len() - divisor).step_by(divisor) {
+    for (j, i) in (0..self.data.len() - divisor).step_by(divisor).enumerate() {
       let sum: f32 = self.data[i..i + divisor].iter().fold(0.0, |mut sum, &val| {
         sum += val;
         sum
@@ -191,7 +189,6 @@ impl SpecOptionsBuilder {
       let avg = sum / (divisor as f32);
 
       self.data[j] = avg;
-      j += 1;
     }
     self.data.resize(self.data.len() / divisor, 0.0);
     self.sample_rate /= divisor as u32;
@@ -233,7 +230,7 @@ impl SpecOptionsBuilder {
     }
 
     for i in 0..self.data.len() {
-      self.data[i] = self.data[i] * scale_factor;
+      self.data[i] *= scale_factor;
     }
 
     self
@@ -330,7 +327,7 @@ impl Spectrograph {
   ///                windows overlap.  It must be value between 0.0
   ///                and 1.0.
   pub fn compute(&mut self, chunk_len: usize, overlap: f32) {
-    assert!(0.0 <= overlap && overlap < 1.0);
+    assert!((0.0..1.0).contains(&overlap));
     let step = (chunk_len as f32 * (1.0 - overlap)) as usize;
 
     if self.verbose {
@@ -533,7 +530,7 @@ impl Spectrograph {
 
   fn get_colour(&mut self, c: Complex<f32>) -> RGBAColour {
     let value = self.get_real(c);
-    self.gradient.get_colour(value).clone()
+    self.gradient.get_colour(value)
   }
 
   fn get_number_of_chunks(&mut self, chunk_len: usize, step: usize) -> usize {
@@ -567,7 +564,7 @@ impl Spectrograph {
       let mut signal: Vec<Complex<f32>> = self.data[p..]
         .iter()
         .take(chunk_len)
-        .map(|d| Complex::new(f32::from(*d), 0.0))
+        .map(|d| Complex::new(*d, 0.0))
         .collect();
 
       self.transform(&mut signal);

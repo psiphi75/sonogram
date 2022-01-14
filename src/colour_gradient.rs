@@ -100,6 +100,12 @@ impl ColourGradient {
   }
 }
 
+impl Default for ColourGradient {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

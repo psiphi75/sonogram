@@ -1,4 +1,3 @@
-use hound;
 use std::io;
 
 // We derive `Debug` because all types should probably derive `Debug`.
