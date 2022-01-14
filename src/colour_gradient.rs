@@ -100,7 +100,6 @@ impl ColourGradient {
   }
 }
 
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -116,17 +115,31 @@ mod tests {
 
     // Test two colours
     assert_eq!(gradient.get_colour(0.0), RGBAColour::new(0, 0, 0, 255));
-    assert_eq!(gradient.get_colour(1.0), RGBAColour::new(255, 255, 255, 255));
-    assert_eq!(gradient.get_colour(0.5), RGBAColour::new(128, 128, 128, 255));
+    assert_eq!(
+      gradient.get_colour(1.0),
+      RGBAColour::new(255, 255, 255, 255)
+    );
+    assert_eq!(
+      gradient.get_colour(0.5),
+      RGBAColour::new(128, 128, 128, 255)
+    );
 
     // Test three colours
     gradient.add_colour(RGBAColour::new(0, 0, 0, 255));
     assert_eq!(gradient.get_colour(0.0), RGBAColour::new(0, 0, 0, 255));
     assert_eq!(gradient.get_colour(1.0), RGBAColour::new(0, 0, 0, 255));
-    assert_eq!(gradient.get_colour(0.5), RGBAColour::new(255, 255, 255, 255));
+    assert_eq!(
+      gradient.get_colour(0.5),
+      RGBAColour::new(255, 255, 255, 255)
+    );
     assert_eq!(gradient.get_colour(0.125), RGBAColour::new(64, 64, 64, 255));
-    assert_eq!(gradient.get_colour(0.25), RGBAColour::new(128, 128, 128, 255));
-    assert_eq!(gradient.get_colour(0.75), RGBAColour::new(128, 128, 128, 255));
+    assert_eq!(
+      gradient.get_colour(0.25),
+      RGBAColour::new(128, 128, 128, 255)
+    );
+    assert_eq!(
+      gradient.get_colour(0.75),
+      RGBAColour::new(128, 128, 128, 255)
+    );
   }
-
 }

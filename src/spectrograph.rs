@@ -49,14 +49,14 @@ type WindowFn = fn(u32, u32) -> f32;
 /// ```
 ///
 pub struct SpecOptionsBuilder {
-  width: u32,       // The width of the output
-  height: u32,      // The height of the output
-  sample_rate: u32, // The sample rate of the wav data
-  data: Vec<f32>,   // Our raw wav data
-  channel: u16,     // The audio channel
-  window: WindowFn, // The windowing function to use.
-  greyscale: bool,  // Is the output in greyscale
-  verbose: bool,    // Do we print out stats and things
+  width: u32,                       // The width of the output
+  height: u32,                      // The height of the output
+  sample_rate: u32,                 // The sample rate of the wav data
+  data: Vec<f32>,                   // Our raw wav data
+  channel: u16,                     // The audio channel
+  window: WindowFn,                 // The windowing function to use.
+  greyscale: bool,                  // Is the output in greyscale
+  verbose: bool,                    // Do we print out stats and things
   gradient: Option<ColourGradient>, // User defined colour gradient
 }
 
@@ -113,7 +113,11 @@ impl SpecOptionsBuilder {
     }
 
     if self.channel > reader.spec().channels {
-      panic!("Channel set to {}, but the audio on has {} channel(s)", self.channel, reader.spec().channels);
+      panic!(
+        "Channel set to {}, but the audio on has {} channel(s)",
+        self.channel,
+        reader.spec().channels
+      );
     }
 
     let data: Vec<i16> = {
@@ -126,9 +130,7 @@ impl SpecOptionsBuilder {
         s.next();
       }
 
-      s.step_by(step_size)
-        .map(|x| x.unwrap())
-        .collect()
+      s.step_by(step_size).map(|x| x.unwrap()).collect()
     };
     let sample_rate = reader.spec().sample_rate;
 
@@ -260,14 +262,14 @@ impl SpecOptionsBuilder {
       match &self.gradient {
         None => {
           let mut gradient = ColourGradient::new();
-          gradient.add_colour(RGBAColour::new(0, 0, 0, 255));// Black
-          gradient.add_colour(RGBAColour::new(55, 0, 110, 255));// Purple
-          gradient.add_colour(RGBAColour::new(0, 0, 180, 255));// Blue
-          gradient.add_colour(RGBAColour::new(0, 255, 255, 255));// Cyan
-          gradient.add_colour(RGBAColour::new(0, 255, 0, 255));// Green
+          gradient.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
+          gradient.add_colour(RGBAColour::new(55, 0, 110, 255)); // Purple
+          gradient.add_colour(RGBAColour::new(0, 0, 180, 255)); // Blue
+          gradient.add_colour(RGBAColour::new(0, 255, 255, 255)); // Cyan
+          gradient.add_colour(RGBAColour::new(0, 255, 0, 255)); // Green
           gradient
-        },
-        Some(gradient) => gradient.clone()
+        }
+        Some(gradient) => gradient.clone(),
       }
     };
 
@@ -441,11 +443,10 @@ impl Spectrograph {
     }
 
     writer.write_image_data(&img).unwrap();
-    
+
     // The png writer needs to be explicitly dropped
     drop(writer);
     pngbuf
-
   }
 
   ///

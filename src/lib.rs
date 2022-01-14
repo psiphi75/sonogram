@@ -17,8 +17,8 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-extern crate png;
 extern crate csv;
+extern crate png;
 
 mod colour_gradient;
 mod errors;

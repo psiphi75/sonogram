@@ -19,7 +19,7 @@ extern crate clap;
 extern crate sonogram;
 
 use clap::{App, Arg};
-use sonogram::{SpecOptionsBuilder, ColourGradient, RGBAColour};
+use sonogram::{ColourGradient, RGBAColour, SpecOptionsBuilder};
 
 const STR_ERR_OVERLAP: &str =
   "Invalid overlap value, it must be an real value greater than 0.0 and less than 0.9";
@@ -218,11 +218,11 @@ fn main() {
   } else {
     // Colour for our plot
     let mut gradient = ColourGradient::new();
-    gradient.add_colour(RGBAColour::new(0, 0, 0, 255));// Black
-    gradient.add_colour(RGBAColour::new(55, 0, 110, 255));// Purple
-    gradient.add_colour(RGBAColour::new(0, 0, 180, 255));// Blue
-    gradient.add_colour(RGBAColour::new(0, 255, 255, 255));// Cyan
-    gradient.add_colour(RGBAColour::new(0, 255, 0, 255));// Green
+    gradient.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
+    gradient.add_colour(RGBAColour::new(55, 0, 110, 255)); // Purple
+    gradient.add_colour(RGBAColour::new(0, 0, 180, 255)); // Blue
+    gradient.add_colour(RGBAColour::new(0, 255, 255, 255)); // Cyan
+    gradient.add_colour(RGBAColour::new(0, 255, 0, 255)); // Green
     spec_builder.set_gradient(gradient);
   }
 
