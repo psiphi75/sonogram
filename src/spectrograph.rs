@@ -403,6 +403,52 @@ impl Spectrograph {
   }
 
   ///
+  /// Create the spectrogram in memory as a PNG.
+  ///
+  /// # Arguments
+  ///
+  ///  * `log_freq` - Apply the log function to the frequency scale.
+  ///
+  pub fn create_png_in_memory(&mut self, log_freq: bool) -> Vec<u8> {
+    let data_len = self.spectrogram[0].len();
+    // Only the data below 1/2 of the sampling rate (nyquist frequency)
+    // is useful
+    let multiplier = 0.5;
+    let img_len_used = data_len as f32 * multiplier;
+
+    let log_coef = 1.0 / (self.height as f32 + 1.0).log(f32::consts::E) * img_len_used;
+
+    let mut pngbuf: Vec<u8> = Vec::new();
+
+    let mut encoder = png::Encoder::new(&mut pngbuf, self.width, self.height);
+    encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().unwrap();
+
+    let mut img: Vec<u8> = vec![];
+
+    for y in (0..self.height).rev() {
+      for x in 0..self.width {
+        let freq = if log_freq {
+          img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
+        } else {
+          let ratio = y as f32 / self.height as f32;
+          ratio * img_len_used
+        };
+
+        let colour = self.get_colour(self.spectrogram[x as usize][freq as usize]);
+        img.extend(colour.to_vec());
+      }
+    }
+
+    writer.write_image_data(&img).unwrap();
+    
+    // The png writer needs to be explicitly dropped
+    drop(writer);
+    pngbuf
+
+  }
+
+  ///
   /// Save the calculated spectrogram as a CSV file.
   ///
   /// # Arguments
