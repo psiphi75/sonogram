@@ -27,5 +27,5 @@ mod utility;
 
 pub use colour_gradient::{ColourGradient, RGBAColour};
 pub use errors::SonogramError;
-pub use spectrograph::{SpecOptionsBuilder, Spectrograph};
+pub use spectrograph::{FrequencyScale, SpecOptionsBuilder, Spectrograph};
 pub use utility::*;

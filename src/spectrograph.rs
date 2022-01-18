@@ -33,6 +33,15 @@ type Spectrogram = Vec<Vec<Complex<f32>>>;
 type WindowFn = fn(u32, u32) -> f32;
 
 ///
+/// The Frequency scale to implement for the vertical axis.
+///
+#[derive(Clone, Copy)]
+pub enum FrequencyScale {
+  Linear,
+  Log,
+}
+
+///
 /// A builder struct that will output a spectrogram creator when complete.
 /// This builder will require the height and width of the final spectrogram,
 /// at a minimum.  However you can load data from a .wav file, or directly
@@ -48,8 +57,8 @@ type WindowFn = fn(u32, u32) -> f32;
 /// ```
 ///
 pub struct SpecOptionsBuilder {
-  width: u32,                       // The width of the output
-  height: u32,                      // The height of the output
+  width: usize,                     // The width of the output
+  height: usize,                    // The height of the output
   sample_rate: u32,                 // The sample rate of the wav data
   data: Vec<f32>,                   // Our raw wav data
   channel: u16,                     // The audio channel
@@ -69,7 +78,7 @@ impl SpecOptionsBuilder {
   ///  * `width` - The final width of the spectrogram.
   ///  * `height` - The final height of the spectrogram.
   ///
-  pub fn new(width: u32, height: u32) -> Self {
+  pub fn new(width: usize, height: usize) -> Self {
     SpecOptionsBuilder {
       width,
       height,
@@ -91,8 +100,8 @@ impl SpecOptionsBuilder {
   ///
   ///  * `window` - The window function to be used.
   ///
-  pub fn set_window_fn(&mut self, window: fn(u32, u32) -> f32) -> &mut Self {
-    self.window = window;
+  pub fn set_window_fn(&mut self, window_fn: WindowFn) -> &mut Self {
+    self.window = window_fn;
     self
   }
 
@@ -144,7 +153,7 @@ impl SpecOptionsBuilder {
   ///  * `sample_rate` - The sample rate, in Hz, of the data.
   ///
   pub fn load_data_from_memory(&mut self, data: Vec<i16>, sample_rate: u32) -> &mut Self {
-    self.data = data.iter().map(|&x| x as f32).collect();
+    self.data = data.iter().map(|&x| x as f32 / (i16::MAX as f32)).collect();
     self.sample_rate = sample_rate;
     self
   }
@@ -153,7 +162,8 @@ impl SpecOptionsBuilder {
   ///
   /// # Arguments
   ///
-  ///  * `data` - The raw wavform data that will be converted to a spectrogram.
+  ///  * `data` - The raw wavform data that will be converted to a spectrogram. Samples must be
+  ///             in the range -1.0 to 1.0.
   ///  * `sample_rate` - The sample rate, in Hz, of the data.
   ///
   pub fn load_data_from_memory_f32(&mut self, data: Vec<f32>, sample_rate: u32) -> &mut Self {
@@ -219,6 +229,17 @@ impl SpecOptionsBuilder {
     self
   }
 
+  pub fn normalise(&mut self) -> &mut Self {
+    let max = self
+      .data
+      .iter()
+      .reduce(|x, max| if x > max { x } else { max })
+      .unwrap();
+    let norm = 1.0 / max;
+    self.data = self.data.iter().map(|x| x * norm).collect();
+    self
+  }
+
   pub fn scale(&mut self, scale_factor: f32) -> &mut Self {
     if self.data.is_empty() {
       panic!("Need to load the data before calling scale");
@@ -229,10 +250,12 @@ impl SpecOptionsBuilder {
       return self;
     }
 
-    for i in 0..self.data.len() {
-      self.data[i] *= scale_factor;
-    }
+    self.data = self.data.iter().map(|x| x * scale_factor).collect();
+    self
+  }
 
+  pub fn to_db(&mut self) -> &mut Self {
+    self.data = self.data.iter().map(|x| 20.0 * x.log10()).collect();
     self
   }
 
@@ -300,8 +323,8 @@ impl SpecOptionsBuilder {
 /// ```
 ///
 pub struct Spectrograph {
-  width: u32,
-  height: u32,
+  width: usize,
+  height: usize,
   data: Vec<f32>,
   window: WindowFn,
   spectrogram: Spectrogram,
@@ -357,43 +380,68 @@ impl Spectrograph {
   }
 
   ///
+  /// Map the spectrogram to the output buffer
+  ///
+  /// # Arguments
+  ///
+  ///  * `freq_scale` - Apply the log function to the frequency scale.
+  ///
+  fn spec_to_buffer(&mut self, freq_scale: FrequencyScale) -> Vec<Complex<f32>> {
+    // Only the data below 1/2 of the sampling rate (nyquist frequency)
+    // is useful
+    let data_len = 0.5 * self.spectrogram[0].len() as f32;
+    let height = self.height as f32;
+    let log_coef = 1.0 / (height + 1.0).log(f32::consts::E) * data_len;
+
+    let mut result = Vec::with_capacity(self.height * self.width);
+    for y in (0..self.height).rev() {
+      for x in 0..self.width {
+        let freq = match freq_scale {
+          FrequencyScale::Log => {
+            data_len - (log_coef * (height + 1.0 - y as f32).log(f32::consts::E))
+          }
+          FrequencyScale::Linear => {
+            let ratio = y as f32 / height;
+            ratio * data_len
+          }
+        } as usize;
+
+        result.push(self.spectrogram[x][freq])
+      }
+    }
+
+    result
+  }
+
+  ///
   /// Save the calculated spectrogram as a PNG image.
   ///
   /// # Arguments
   ///
   ///  * `fname` - The path to the PNG to save to the filesystem.
-  ///  * `log_freq` - Apply the log function to the frequency scale.
+  ///  * `freq_scale` - Apply the log function to the frequency scale.
   ///
-  pub fn save_as_png(&mut self, fname: &Path, log_freq: bool) -> Result<(), std::io::Error> {
-    let data_len = self.spectrogram[0].len();
-    // Only the data below 1/2 of the sampling rate (nyquist frequency)
-    // is useful
-    let multiplier = 0.5;
-    let img_len_used = data_len as f32 * multiplier;
-
-    let log_coef = 1.0 / (self.height as f32 + 1.0).log(f32::consts::E) * img_len_used;
-
+  pub fn save_as_png(
+    &mut self,
+    fname: &Path,
+    freq_scale: FrequencyScale,
+  ) -> Result<(), std::io::Error> {
     let file = File::create(fname)?;
     let w = &mut BufWriter::new(file);
 
-    let mut encoder = png::Encoder::new(w, self.width, self.height);
+    let mut encoder = png::Encoder::new(w, self.width as u32, self.height as u32);
     encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
     let mut writer = encoder.write_header()?;
 
-    let mut img: Vec<u8> = vec![];
+    let result = self.spec_to_buffer(freq_scale);
 
-    for y in (0..self.height).rev() {
-      for x in 0..self.width {
-        let freq = if log_freq {
-          img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
-        } else {
-          let ratio = y as f32 / self.height as f32;
-          ratio * img_len_used
-        };
-
-        let colour = self.get_colour(self.spectrogram[x as usize][freq as usize]);
-        img.extend(colour.to_vec());
-      }
+    let mut img: Vec<u8> = vec![0u8; result.len() * 4];
+    for (i, val) in result.iter().enumerate() {
+      let colour = self.get_colour(*val).to_vec();
+      img[i * 4 + 0] = colour[0];
+      img[i * 4 + 1] = colour[1];
+      img[i * 4 + 2] = colour[2];
+      img[i * 4 + 3] = colour[3];
     }
 
     writer.write_image_data(&img)?; // Save
@@ -406,44 +454,34 @@ impl Spectrograph {
   ///
   /// # Arguments
   ///
-  ///  * `log_freq` - Apply the log function to the frequency scale.
+  ///  * `freq_scale` - Apply the log function to the frequency scale.
   ///
-  pub fn create_png_in_memory(&mut self, log_freq: bool) -> Vec<u8> {
-    let data_len = self.spectrogram[0].len();
-    // Only the data below 1/2 of the sampling rate (nyquist frequency)
-    // is useful
-    let multiplier = 0.5;
-    let img_len_used = data_len as f32 * multiplier;
-
-    let log_coef = 1.0 / (self.height as f32 + 1.0).log(f32::consts::E) * img_len_used;
-
+  pub fn create_png_in_memory(
+    &mut self,
+    freq_scale: FrequencyScale,
+  ) -> Result<Vec<u8>, std::io::Error> {
     let mut pngbuf: Vec<u8> = Vec::new();
 
-    let mut encoder = png::Encoder::new(&mut pngbuf, self.width, self.height);
+    let mut encoder = png::Encoder::new(&mut pngbuf, self.width as u32, self.height as u32);
     encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
-    let mut writer = encoder.write_header().unwrap();
+    let mut writer = encoder.write_header()?;
 
-    let mut img: Vec<u8> = vec![];
+    let result = self.spec_to_buffer(freq_scale);
 
-    for y in (0..self.height).rev() {
-      for x in 0..self.width {
-        let freq = if log_freq {
-          img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
-        } else {
-          let ratio = y as f32 / self.height as f32;
-          ratio * img_len_used
-        };
-
-        let colour = self.get_colour(self.spectrogram[x as usize][freq as usize]);
-        img.extend(colour.to_vec());
-      }
+    let mut img: Vec<u8> = vec![0u8; result.len() * 4];
+    for (i, val) in result.iter().enumerate() {
+      let colour = self.get_colour(*val).to_vec();
+      img[i * 4 + 0] = colour[0];
+      img[i * 4 + 1] = colour[1];
+      img[i * 4 + 2] = colour[2];
+      img[i * 4 + 3] = colour[3];
     }
 
-    writer.write_image_data(&img).unwrap();
+    writer.write_image_data(&img)?;
 
     // The png writer needs to be explicitly dropped
     drop(writer);
-    pngbuf
+    Ok(pngbuf)
   }
 
   ///
@@ -452,34 +490,26 @@ impl Spectrograph {
   /// # Arguments
   ///
   ///  * `fname` - The path to the CSV to save to the filesystem.
-  ///  * `log_freq` - Apply the log function to the frequency scale.
+  ///  * `freq_scale` - Apply the log function to the frequency scale.
   ///
-  pub fn save_as_csv(&mut self, fname: &Path, log_freq: bool) -> Result<(), std::io::Error> {
-    let data_len = self.spectrogram[0].len();
-    // Only the data below 1/2 of the sampling rate (nyquist frequency)
-    // is useful
-    let multiplier = 0.5;
-    let img_len_used = data_len as f32 * multiplier;
-
-    let log_coef = 1.0 / (self.height as f32 + 1.0).log(f32::consts::E) * img_len_used;
-
+  pub fn save_as_csv(
+    &mut self,
+    fname: &Path,
+    freq_scale: FrequencyScale,
+  ) -> Result<(), std::io::Error> {
     let mut writer = csv::Writer::from_path(fname)?;
-
     // Create the CSV header
     let mut csv_record: Vec<String> = (0..self.width).into_iter().map(|x| x.to_string()).collect();
     writer.write_record(&csv_record)?;
 
-    for y in (0..self.height).rev() {
-      for x in 0..self.width {
-        let freq = if log_freq {
-          img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
-        } else {
-          let ratio = y as f32 / self.height as f32;
-          ratio * img_len_used
-        };
+    let result = self.spec_to_buffer(freq_scale);
 
-        let value = self.get_real(self.spectrogram[x as usize][freq as usize]);
-        csv_record[x as usize] = value.to_string();
+    let mut i = 0;
+    for _ in 0..self.height {
+      for x in 0..self.width {
+        let val = result[i];
+        i += 1;
+        csv_record[x] = self.get_real(val).to_string();
       }
       writer.write_record(&csv_record)?;
     }
@@ -494,34 +524,14 @@ impl Spectrograph {
   ///
   /// # Arguments
   ///
-  ///  * `log_freq` - Apply the log function to the frequency scale.
+  ///  * `freq_scale` - Apply the log function to the frequency scale.
   ///
-  pub fn create_in_memory(&mut self, log_freq: bool) -> Vec<f32> {
-    let data_len = self.spectrogram[0].len();
-    // Only the data below 1/2 of the sampling rate (nyquist frequency)
-    // is useful
-    let multiplier = 0.5;
-    let img_len_used = data_len as f32 * multiplier;
-
-    let log_coef = 1.0 / (self.height as f32 + 1.0).log(f32::consts::E) * img_len_used;
-
-    let mut result = Vec::with_capacity((self.height * self.width) as usize);
-
-    for y in (0..self.height).rev() {
-      for x in 0..self.width {
-        let freq = if log_freq {
-          img_len_used - (log_coef * (self.height as f32 + 1.0 - y as f32).log(f32::consts::E))
-        } else {
-          let ratio = y as f32 / self.height as f32;
-          ratio * img_len_used
-        };
-
-        let value = self.get_real(self.spectrogram[x as usize][freq as usize]);
-        result.push(value)
-      }
-    }
-
-    result
+  pub fn create_in_memory(&mut self, freq_scale: FrequencyScale) -> Vec<f32> {
+    self
+      .spec_to_buffer(freq_scale)
+      .iter()
+      .map(|c| self.get_real(*c))
+      .collect()
   }
 
   fn get_real(&mut self, c: Complex<f32>) -> f32 {

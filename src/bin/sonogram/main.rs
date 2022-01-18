@@ -19,7 +19,7 @@ extern crate clap;
 extern crate sonogram;
 
 use clap::{App, Arg};
-use sonogram::{ColourGradient, RGBAColour, SpecOptionsBuilder};
+use sonogram::{ColourGradient, FrequencyScale, RGBAColour, SpecOptionsBuilder};
 
 const STR_ERR_OVERLAP: &str =
   "Invalid overlap value, it must be an real value greater than 0.0 and less than 0.9";
@@ -115,7 +115,7 @@ fn main() {
       Arg::with_name("overlap")
         .long("overlap")
         .value_name("OVERLAP")
-        .help("The overlap between windows, in fraction")
+        .help("The overlap between windows, as a fraction")
         .default_value("0.0")
         .takes_value(true),
     )
@@ -131,6 +131,15 @@ fn main() {
         .value_name("SCALE")
         .help("Scale the wav values by factor before computing spectrogram")
         .default_value("1.0")
+        .takes_value(true),
+    )
+    .arg(
+      Arg::with_name("freq-scale")
+        .long("freq-scale")
+        .value_name("TYPE")
+        .help("The type of scale to use for frequency")
+        .default_value("linear")
+        .possible_values(&["linear", "log"])
         .takes_value(true),
     )
     .arg(
@@ -159,11 +168,11 @@ fn main() {
     Ok(n) => n,
     Err(_) => panic!("Invalid channel value, it must be an integer greater than 1"),
   };
-  let width = match matches.value_of("width").unwrap().parse::<u32>() {
+  let width = match matches.value_of("width").unwrap().parse::<usize>() {
     Ok(n) => n,
     Err(_) => panic!("Invalid width value, it must be an integer greater than 1"),
   };
-  let height = match matches.value_of("height").unwrap().parse::<u32>() {
+  let height = match matches.value_of("height").unwrap().parse::<usize>() {
     Ok(n) => n,
     Err(_) => panic!("Invalid height value, it must be an integer greater than 1"),
   };
@@ -171,6 +180,11 @@ fn main() {
     "blackman_harris" => sonogram::blackman_harris,
     "rectangular" => sonogram::rectangular,
     "hann" => sonogram::hann_function,
+    _ => panic!("Invalid window function"),
+  };
+  let freq_scale = match matches.value_of("freq-scale").unwrap() {
+    "linear" => FrequencyScale::Linear,
+    "log" => FrequencyScale::Log,
     _ => panic!("Invalid window function"),
   };
   let chunk_len = match matches.value_of("chunk-len").unwrap().parse::<usize>() {
@@ -244,13 +258,13 @@ fn main() {
   if matches.is_present("png") {
     let png_file = matches.value_of("png").unwrap();
     spectrograph
-      .save_as_png(std::path::Path::new(png_file), false)
+      .save_as_png(std::path::Path::new(png_file), freq_scale)
       .unwrap()
   }
   if matches.is_present("csv") {
     let csv_file = matches.value_of("csv").unwrap();
     spectrograph
-      .save_as_csv(std::path::Path::new(csv_file), false)
+      .save_as_csv(std::path::Path::new(csv_file), freq_scale)
       .unwrap()
   }
 
