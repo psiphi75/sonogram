@@ -233,7 +233,7 @@ impl SpecOptionsBuilder {
     let max = self
       .data
       .iter()
-      .reduce(|x, max| if x > max { x } else { max })
+      .reduce(|max, x| if x > max { x } else { max })
       .unwrap();
     let norm = 1.0 / max;
     self.data = self.data.iter().map(|x| x * norm).collect();
@@ -380,7 +380,8 @@ impl Spectrograph {
   }
 
   ///
-  /// Map the spectrogram to the output buffer
+  /// Map the spectrogram to the output buffer.  Essentially scales the
+  /// frequency to map to the vertical axis (y-axis) of the output.
   ///
   /// # Arguments
   ///
@@ -391,22 +392,20 @@ impl Spectrograph {
     // is useful
     let data_len = 0.5 * self.spectrogram[0].len() as f32;
     let height = self.height as f32;
-    let log_coef = 1.0 / (height + 1.0).log(f32::consts::E) * data_len;
+    let log_coef = 1.0 / (height + 1.0).ln() * data_len;
 
     let mut result = Vec::with_capacity(self.height * self.width);
     for y in (0..self.height).rev() {
-      for x in 0..self.width {
-        let freq = match freq_scale {
-          FrequencyScale::Log => {
-            data_len - (log_coef * (height + 1.0 - y as f32).log(f32::consts::E))
-          }
-          FrequencyScale::Linear => {
-            let ratio = y as f32 / height;
-            ratio * data_len
-          }
-        } as usize;
+      let (f1, f2) = match freq_scale {
+        FrequencyScale::Log => map_log_freq(y, data_len, height, log_coef),
+        FrequencyScale::Linear => (
+          (y as f32 / height) * data_len,
+          ((y + 1) as f32 / height) * data_len,
+        ),
+      };
 
-        result.push(self.spectrogram[x][freq])
+      for x in 0..self.width {
+        result.push(integrate_spec(f1, f2, &self.spectrogram[x]))
       }
     }
 
@@ -438,7 +437,7 @@ impl Spectrograph {
     let mut img: Vec<u8> = vec![0u8; result.len() * 4];
     for (i, val) in result.iter().enumerate() {
       let colour = self.get_colour(*val).to_vec();
-      img[i * 4 + 0] = colour[0];
+      img[i * 4] = colour[0];
       img[i * 4 + 1] = colour[1];
       img[i * 4 + 2] = colour[2];
       img[i * 4 + 3] = colour[3];
@@ -471,7 +470,7 @@ impl Spectrograph {
     let mut img: Vec<u8> = vec![0u8; result.len() * 4];
     for (i, val) in result.iter().enumerate() {
       let colour = self.get_colour(*val).to_vec();
-      img[i * 4 + 0] = colour[0];
+      img[i * 4] = colour[0];
       img[i * 4 + 1] = colour[1];
       img[i * 4 + 2] = colour[2];
       img[i * 4 + 3] = colour[3];
@@ -506,10 +505,10 @@ impl Spectrograph {
 
     let mut i = 0;
     for _ in 0..self.height {
-      for x in 0..self.width {
+      for c_rec in csv_record.iter_mut().take(self.width) {
         let val = result[i];
         i += 1;
-        csv_record[x] = self.get_real(val).to_string();
+        *c_rec = self.get_real(val).to_string();
       }
       writer.write_record(&csv_record)?;
     }
@@ -641,5 +640,63 @@ fn pad_to_power2(signal: &mut Vec<Complex<f32>>, min_len: usize) -> usize {
 fn pad(signal: &mut Vec<Complex<f32>>, new_len: usize) {
   if new_len > signal.len() {
     signal.resize_with(new_len, || Complex::new(0.0, 0.0));
+  }
+}
+
+fn map_log_freq(y: usize, data_len: f32, height: f32, log_coef: f32) -> (f32, f32) {
+  let f1 = data_len - (log_coef * (height + 1.0 - y as f32).ln());
+  let f2 = data_len - (log_coef * (height + 1.0 - (y + 1) as f32).ln());
+  (f1, f2)
+}
+
+fn integrate_spec(f1: f32, f2: f32, spec: &Vec<Complex<f32>>) -> Complex<f32> {
+  let i_f1 = f1.floor() as usize;
+  let i_f2 = f2.floor() as usize;
+  let f_f1 = f1.fract();
+  let f_f2 = f2.fract();
+
+  // Calculate the ratio from
+  let ratio = |v1, v2, frac| (v2 - v1) * (frac);
+
+  if i_f1 == i_f2 {
+    ratio(spec[i_f1], spec[i_f1 + 1], f_f2 - f_f1)
+  } else {
+    // Need to integrate from f1 to f2
+    let mut result = ratio(spec[i_f1], spec[i_f1 + 1], 1.0 - f_f1);
+    for i in (i_f1 + 1)..i_f2 {
+      result += spec[i];
+    }
+    result += ratio(spec[i_f2], spec[i_f2 + 1], f_f2);
+    result
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_integrate_spec() {
+    let v = vec![
+      Complex::new(0.0, 0.0),
+      Complex::new(1.0, 0.0),
+      Complex::new(2.0, 0.0),
+      Complex::new(4.0, 0.0),
+    ];
+
+    // No number boundary
+    let c = integrate_spec(0.6, 0.8, &v);
+    assert!((c.norm() - 0.2) < 0.0001);
+
+    let c = integrate_spec(1.000001, 1.999999, &v);
+    assert!((c.norm() - 1.0) < 0.001);
+
+    // One number boundary
+    let c = integrate_spec(1.6, 2.2, &v);
+    assert!((c.norm() - 0.8) < 0.0001);
+
+    // Two number boundary
+    let c = integrate_spec(0.00001, 2.99999, &v);
+    assert!((c.norm() - 7.0) < 0.0001);
   }
 }
