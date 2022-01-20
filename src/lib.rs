@@ -22,10 +22,12 @@ extern crate png;
 
 mod colour_gradient;
 mod errors;
+mod freq_scales;
 mod spectrograph;
 mod utility;
 
 pub use colour_gradient::{ColourGradient, RGBAColour};
 pub use errors::SonogramError;
-pub use spectrograph::{FrequencyScale, SpecOptionsBuilder, Spectrograph};
+pub use freq_scales::FrequencyScale;
+pub use spectrograph::{SpecOptionsBuilder, Spectrograph};
 pub use utility::*;

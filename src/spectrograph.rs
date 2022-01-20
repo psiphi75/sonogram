@@ -27,19 +27,11 @@ use png::HasParameters; // To use encoder.set()
 
 use crate::colour_gradient::{ColourGradient, RGBAColour};
 use crate::errors::SonogramError;
+use crate::freq_scales::*;
 use crate::utility;
 
 type Spectrogram = Vec<Vec<Complex<f32>>>;
 type WindowFn = fn(u32, u32) -> f32;
-
-///
-/// The Frequency scale to implement for the vertical axis.
-///
-#[derive(Clone, Copy)]
-pub enum FrequencyScale {
-  Linear,
-  Log,
-}
 
 ///
 /// A builder struct that will output a spectrogram creator when complete.
@@ -390,22 +382,14 @@ impl Spectrograph {
   fn spec_to_buffer(&mut self, freq_scale: FrequencyScale) -> Vec<Complex<f32>> {
     // Only the data below 1/2 of the sampling rate (nyquist frequency)
     // is useful
-    let data_len = 0.5 * self.spectrogram[0].len() as f32;
-    let height = self.height as f32;
-    let log_coef = 1.0 / (height + 1.0).ln() * data_len;
+    let nyquist_len = 0.5 * self.spectrogram[0].len() as f32;
+    let scaler = FreqScaler::create(freq_scale, nyquist_len, self.height as f32);
 
     let mut result = Vec::with_capacity(self.height * self.width);
     for y in (0..self.height).rev() {
-      let (f1, f2) = match freq_scale {
-        FrequencyScale::Log => map_log_freq(y, data_len, height, log_coef),
-        FrequencyScale::Linear => (
-          (y as f32 / height) * data_len,
-          ((y + 1) as f32 / height) * data_len,
-        ),
-      };
-
+      let (f1, f2) = scaler.scale(y);
       for x in 0..self.width {
-        result.push(integrate_spec(f1, f2, &self.spectrogram[x]))
+        result.push(utility::integrate(f1, f2, &self.spectrogram[x]))
       }
     }
 
@@ -586,7 +570,7 @@ impl Spectrograph {
   // TODO: Cache calculations of omega
   fn transform(&mut self, signal: &mut Vec<Complex<f32>>) {
     let min_len = signal.len();
-    let power = pad_to_power2(signal, min_len);
+    let power = utility::pad_to_power2(signal, min_len);
 
     if power == 0 {
       return;
@@ -619,84 +603,5 @@ impl Spectrograph {
     // Copy the data back into signal
     signal.clear();
     signal.extend(transformed.into_iter());
-  }
-}
-
-fn pad_to_power2(signal: &mut Vec<Complex<f32>>, min_len: usize) -> usize {
-  let mut power = 1;
-  let mut new_len = 2;
-
-  while new_len < min_len {
-    new_len *= 2;
-    power += 1;
-  }
-  pad(signal, new_len);
-  let padding = &mut vec![Complex::new(0.0, 0.0); new_len - signal.len()];
-  signal.append(padding);
-
-  power
-}
-
-fn pad(signal: &mut Vec<Complex<f32>>, new_len: usize) {
-  if new_len > signal.len() {
-    signal.resize_with(new_len, || Complex::new(0.0, 0.0));
-  }
-}
-
-fn map_log_freq(y: usize, data_len: f32, height: f32, log_coef: f32) -> (f32, f32) {
-  let f1 = data_len - (log_coef * (height + 1.0 - y as f32).ln());
-  let f2 = data_len - (log_coef * (height + 1.0 - (y + 1) as f32).ln());
-  (f1, f2)
-}
-
-fn integrate_spec(f1: f32, f2: f32, spec: &Vec<Complex<f32>>) -> Complex<f32> {
-  let i_f1 = f1.floor() as usize;
-  let i_f2 = f2.floor() as usize;
-  let f_f1 = f1.fract();
-  let f_f2 = f2.fract();
-
-  // Calculate the ratio from
-  let ratio = |v1, v2, frac| (v2 - v1) * (frac);
-
-  if i_f1 == i_f2 {
-    ratio(spec[i_f1], spec[i_f1 + 1], f_f2 - f_f1)
-  } else {
-    // Need to integrate from f1 to f2
-    let mut result = ratio(spec[i_f1], spec[i_f1 + 1], 1.0 - f_f1);
-    for i in (i_f1 + 1)..i_f2 {
-      result += spec[i];
-    }
-    result += ratio(spec[i_f2], spec[i_f2 + 1], f_f2);
-    result
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn test_integrate_spec() {
-    let v = vec![
-      Complex::new(0.0, 0.0),
-      Complex::new(1.0, 0.0),
-      Complex::new(2.0, 0.0),
-      Complex::new(4.0, 0.0),
-    ];
-
-    // No number boundary
-    let c = integrate_spec(0.6, 0.8, &v);
-    assert!((c.norm() - 0.2) < 0.0001);
-
-    let c = integrate_spec(1.000001, 1.999999, &v);
-    assert!((c.norm() - 1.0) < 0.001);
-
-    // One number boundary
-    let c = integrate_spec(1.6, 2.2, &v);
-    assert!((c.norm() - 0.8) < 0.0001);
-
-    // Two number boundary
-    let c = integrate_spec(0.00001, 2.99999, &v);
-    assert!((c.norm() - 7.0) < 0.0001);
   }
 }
