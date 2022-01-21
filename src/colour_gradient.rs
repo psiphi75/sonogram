@@ -17,6 +17,15 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#[derive(Clone, Copy)]
+pub enum ColourTheme {
+  Default,
+  Audacity, // Same has the default in the audio application of the same name.
+  Rainbow,
+  BlackWhite, // Black background to white foreground.
+  WhiteBlack, // White background to black foreground.
+}
+
 /// Colours required for a PNG file, includes the alpha channel.
 #[derive(Clone, PartialEq, Debug)]
 pub struct RGBAColour {
@@ -52,6 +61,64 @@ impl ColourGradient {
       min: 0.0,
       max: 1.0,
     }
+  }
+
+  pub fn create(theme: ColourTheme) -> Self {
+    match theme {
+      ColourTheme::Default => Self::default_theme(),
+      ColourTheme::Audacity => Self::audacity_theme(),
+      ColourTheme::Rainbow => Self::black_white_theme(),
+      ColourTheme::BlackWhite => Self::white_black_theme(),
+      ColourTheme::WhiteBlack => Self::default_theme(),
+    }
+  }
+
+  pub fn default_theme() -> Self {
+    let mut result = ColourGradient::new();
+    result.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
+    result.add_colour(RGBAColour::new(55, 0, 110, 255)); // Purple
+    result.add_colour(RGBAColour::new(0, 0, 180, 255)); // Blue
+    result.add_colour(RGBAColour::new(0, 255, 255, 255)); // Cyan
+    result.add_colour(RGBAColour::new(0, 255, 0, 255)); // Green
+    result
+  }
+
+  pub fn audacity_theme() -> Self {
+    let mut result = ColourGradient::new();
+    result.add_colour(RGBAColour::new(215, 215, 215, 255)); // Grey
+    result.add_colour(RGBAColour::new(114, 169, 242, 255)); // Blue
+    result.add_colour(RGBAColour::new(227, 61, 215, 255)); // Pink
+    result.add_colour(RGBAColour::new(246, 55, 55, 255)); // Red
+    result.add_colour(RGBAColour::new(255, 255, 255, 255)); // White
+    result
+  }
+
+  pub fn rainbow_theme() -> Self {
+    let mut result = ColourGradient::new();
+    result.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
+    result.add_colour(RGBAColour::new(148, 0, 211, 255)); // Violet
+    result.add_colour(RGBAColour::new(75, 0, 130, 255)); // Indigo
+    result.add_colour(RGBAColour::new(0, 0, 255, 255)); // Blue
+    result.add_colour(RGBAColour::new(0, 255, 0, 255)); // Green
+    result.add_colour(RGBAColour::new(255, 255, 0, 255)); // Yellow
+    result.add_colour(RGBAColour::new(255, 127, 0, 255)); // Orange
+    result.add_colour(RGBAColour::new(255, 0, 0, 255)); // Red
+    result.add_colour(RGBAColour::new(255, 255, 255, 255)); // White
+    result
+  }
+
+  pub fn black_white_theme() -> Self {
+    let mut result = ColourGradient::new();
+    result.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
+    result.add_colour(RGBAColour::new(255, 255, 255, 255)); // White
+    result
+  }
+
+  pub fn white_black_theme() -> Self {
+    let mut result = ColourGradient::new();
+    result.add_colour(RGBAColour::new(255, 255, 255, 255)); // White
+    result.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
+    result
   }
 
   pub fn get_colour(&self, value: f32) -> RGBAColour {
