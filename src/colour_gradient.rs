@@ -67,9 +67,9 @@ impl ColourGradient {
     match theme {
       ColourTheme::Default => Self::default_theme(),
       ColourTheme::Audacity => Self::audacity_theme(),
-      ColourTheme::Rainbow => Self::black_white_theme(),
-      ColourTheme::BlackWhite => Self::white_black_theme(),
-      ColourTheme::WhiteBlack => Self::default_theme(),
+      ColourTheme::Rainbow => Self::rainbow_theme(),
+      ColourTheme::BlackWhite => Self::black_white_theme(),
+      ColourTheme::WhiteBlack => Self::white_black_theme(),
     }
   }
 
@@ -95,7 +95,7 @@ impl ColourGradient {
 
   pub fn rainbow_theme() -> Self {
     let mut result = ColourGradient::new();
-    result.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
+    result.add_colour(RGBAColour::new(255, 255, 255, 255)); // White
     result.add_colour(RGBAColour::new(148, 0, 211, 255)); // Violet
     result.add_colour(RGBAColour::new(75, 0, 130, 255)); // Indigo
     result.add_colour(RGBAColour::new(0, 0, 255, 255)); // Blue

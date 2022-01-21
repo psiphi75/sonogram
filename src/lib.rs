@@ -26,7 +26,7 @@ mod freq_scales;
 mod spectrograph;
 mod utility;
 
-pub use colour_gradient::{ColourGradient, RGBAColour};
+pub use colour_gradient::{ColourGradient, ColourTheme, RGBAColour};
 pub use errors::SonogramError;
 pub use freq_scales::FrequencyScale;
 pub use spectrograph::{SpecOptionsBuilder, Spectrograph};

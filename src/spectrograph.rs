@@ -27,8 +27,8 @@ use png::HasParameters; // To use encoder.set()
 
 use crate::colour_gradient::{ColourGradient, RGBAColour};
 use crate::errors::SonogramError;
-use crate::freq_scales::*;
 use crate::utility;
+use crate::{freq_scales::*, ColourTheme};
 
 type Spectrogram = Vec<Vec<Complex<f32>>>;
 type WindowFn = fn(u32, u32) -> f32;
@@ -49,15 +49,14 @@ type WindowFn = fn(u32, u32) -> f32;
 /// ```
 ///
 pub struct SpecOptionsBuilder {
-  width: usize,                     // The width of the output
-  height: usize,                    // The height of the output
-  sample_rate: u32,                 // The sample rate of the wav data
-  data: Vec<f32>,                   // Our raw wav data
-  channel: u16,                     // The audio channel
-  window: WindowFn,                 // The windowing function to use.
-  greyscale: bool,                  // Is the output in greyscale
-  verbose: bool,                    // Do we print out stats and things
-  gradient: Option<ColourGradient>, // User defined colour gradient
+  width: usize,             // The width of the output
+  height: usize,            // The height of the output
+  sample_rate: u32,         // The sample rate of the wav data
+  data: Vec<f32>,           // Our raw wav data
+  channel: u16,             // The audio channel
+  window: WindowFn,         // The windowing function to use.
+  verbose: bool,            // Do we print out stats and things
+  gradient: ColourGradient, // User defined colour gradient
 }
 
 impl SpecOptionsBuilder {
@@ -78,9 +77,8 @@ impl SpecOptionsBuilder {
       data: vec![],
       channel: 1,
       window: utility::rectangular,
-      greyscale: false,
       verbose: false,
-      gradient: None,
+      gradient: ColourGradient::create(ColourTheme::Default),
     }
   }
 
@@ -211,13 +209,8 @@ impl SpecOptionsBuilder {
     self
   }
 
-  pub fn set_greyscale(&mut self) -> &mut Self {
-    self.greyscale = true;
-    self
-  }
-
   pub fn set_gradient(&mut self, gradient: ColourGradient) -> &mut Self {
-    self.gradient = Some(gradient);
+    self.gradient = gradient;
     self
   }
 
@@ -264,34 +257,13 @@ impl SpecOptionsBuilder {
       println!("Length (s): {}", audio_length_sec);
     }
 
-    // Override the colour gradient if one is set
-    let gradient = if self.greyscale {
-      let mut gradient = ColourGradient::new();
-      gradient.add_colour(RGBAColour::new(0, 0, 0, 255));
-      gradient.add_colour(RGBAColour::new(255, 255, 255, 255));
-      gradient
-    } else {
-      match &self.gradient {
-        None => {
-          let mut gradient = ColourGradient::new();
-          gradient.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
-          gradient.add_colour(RGBAColour::new(55, 0, 110, 255)); // Purple
-          gradient.add_colour(RGBAColour::new(0, 0, 180, 255)); // Blue
-          gradient.add_colour(RGBAColour::new(0, 255, 255, 255)); // Cyan
-          gradient.add_colour(RGBAColour::new(0, 255, 0, 255)); // Green
-          gradient
-        }
-        Some(gradient) => gradient.clone(),
-      }
-    };
-
     Spectrograph {
       width: self.width,
       height: self.height,
       data: self.data.clone(), // TODO: There's probably more efficient ways of doing this
       window: self.window,
       spectrogram: vec![vec![]],
-      gradient,
+      gradient: self.gradient.clone(),
       verbose: self.verbose,
     }
   }

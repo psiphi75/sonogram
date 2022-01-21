@@ -19,7 +19,7 @@ extern crate clap;
 extern crate sonogram;
 
 use clap::{App, Arg};
-use sonogram::{ColourGradient, FrequencyScale, RGBAColour, SpecOptionsBuilder};
+use sonogram::{ColourGradient, ColourTheme, FrequencyScale, SpecOptionsBuilder};
 
 const STR_ERR_OVERLAP: &str =
   "Invalid overlap value, it must be an real value greater than 0.0 and less than 0.9";
@@ -90,6 +90,7 @@ fn main() {
     .arg(
       Arg::with_name("width")
         .long("width")
+        .short("x")
         .value_name("PIXELS")
         .help("The width of the output in pixels")
         .default_value("256")
@@ -98,6 +99,7 @@ fn main() {
     .arg(
       Arg::with_name("height")
         .long("height")
+        .short("y")
         .value_name("PIXELS")
         .help("The height of the output in pixels")
         .default_value("256")
@@ -120,12 +122,6 @@ fn main() {
         .takes_value(true),
     )
     .arg(
-      Arg::with_name("greyscale")
-        .long("greyscale")
-        .help("Output png as greyscale")
-        .takes_value(false),
-    )
-    .arg(
       Arg::with_name("scale")
         .long("scale")
         .value_name("SCALE")
@@ -140,6 +136,22 @@ fn main() {
         .help("The type of scale to use for frequency")
         .default_value("linear")
         .possible_values(&["linear", "log"])
+        .takes_value(true),
+    )
+    .arg(
+      Arg::with_name("gradient")
+        .long("gradient")
+        .short("g")
+        .value_name("NAME")
+        .help("The colour gradient to implement")
+        .default_value("default")
+        .possible_values(&[
+          "default",
+          "audacity",
+          "rainbow",
+          "black-white",
+          "white-black",
+        ])
         .takes_value(true),
     )
     .arg(
@@ -217,7 +229,6 @@ fn main() {
     }
     Err(_) => panic!("{}", STR_ERR_SCALE_RANGE),
   };
-  let greyscale = matches.is_present("greyscale");
   let quiet = !matches.is_present("quiet");
 
   //
@@ -227,18 +238,15 @@ fn main() {
   if quiet {
     spec_builder.set_verbose();
   }
-  if greyscale {
-    spec_builder.set_greyscale();
-  } else {
-    // Colour for our plot
-    let mut gradient = ColourGradient::new();
-    gradient.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
-    gradient.add_colour(RGBAColour::new(55, 0, 110, 255)); // Purple
-    gradient.add_colour(RGBAColour::new(0, 0, 180, 255)); // Blue
-    gradient.add_colour(RGBAColour::new(0, 255, 255, 255)); // Cyan
-    gradient.add_colour(RGBAColour::new(0, 255, 0, 255)); // Green
-    spec_builder.set_gradient(gradient);
-  }
+
+  let gradient = match matches.value_of("gradient").unwrap() {
+    "default" => ColourGradient::create(ColourTheme::Default),
+    "audacity" => ColourGradient::create(ColourTheme::Audacity),
+    "rainbow" => ColourGradient::create(ColourTheme::Rainbow),
+    "black-white" => ColourGradient::create(ColourTheme::BlackWhite),
+    "white-black" => ColourGradient::create(ColourTheme::WhiteBlack),
+    c => panic!("Invalid colour: {}", c),
+  };
 
   spec_builder
     .set_window_fn(window_fn)
@@ -246,6 +254,7 @@ fn main() {
     .load_data_from_file(std::path::Path::new(wav_file))
     .unwrap()
     .downsample(downsample)
+    .set_gradient(gradient)
     .scale(scale);
 
   let mut spectrograph = spec_builder.build();

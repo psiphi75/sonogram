@@ -1,31 +1,28 @@
-# Sonogram: Wave to Spectrogram converter - in Rust
+# Sonogram
 
-Create a sonogram\* from a wave form, or .wav file. This crate can take a
-.wav file and convert it into a spectrogram. The spectrogram can be saved
-as a PNG file. An example CLI progam is included that helps convert .wav
-files to .png spectrograms.
+Create a sonogram\* from an wave form, or importing a `.wav` file.
 
-The code is intended to be used as a library that can be used to convert
-in-memory wave forms to a spectrograph.
+The spectrogram can be saved as a `.png` file, a `.csv` file, or
+stored in memory. An example command line application is included
+that converts `.wav` files to `.png` spectrograms.
 
-Example output PNG:
+_Example output `.png`:_
 
 ![Sample sonogram](https://raw.githubusercontent.com/psiphi75/sonogram/master/samples/Globular-PoppingOut.png)
 
 \*Note: sonogram, spectrograph, spectrogram, or power spectral density
-plot are common names of similar things.
+plots are common names of similar things.
 
-## Running usin the CLI
+## Running the command line appplication
 
 ```sh
 cargo run --release --bin sonogram -- --wav input.wav --png ouput.png
 ```
 
-## Completing an in-memory conversion
+## Saving to a `.png` file
 
 ```Rust
-// You'll need to fill `waveform` with data.
-let waveform: Vec<i16> = vec![];
+let waveform: Vec<i16> = vec![/* ... some data ... */];
 
 // Build the model
 let mut spectrograph = SpecOptionsBuilder::new(512, 128)
@@ -37,11 +34,12 @@ spectrograph.compute(2048, 0.8);
 
 // Save the spectrogram to PNG.
 let png_file = std::path::Path::new("path/to/file.png");
-spectrograph.save_as_png(&png_file, false)?;
-
+spectrograph.save_as_png(&png_file, FrequencyScale::Linear)?;
 ```
 
-## Using your own colour gradient
+## Customise the colour gradient
+
+For `.png` images you can customise the colour gradient:
 
 ```Rust
 let mut gradient = ColourGradient::new();
@@ -53,6 +51,12 @@ gradient.add_colour(RGBAColour::new(0, 255, 0, 255));   // Green
 spec_builder.set_gradient(gradient);
 ```
 
+Or use a built-in colour gradient theme:
+
+```Rust
+let mut gradient = ColourGradient::rainbow_theme();
+spec_builder.set_gradient(gradient);
+```
 
 ## License
 
