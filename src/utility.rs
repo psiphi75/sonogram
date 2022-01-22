@@ -20,7 +20,7 @@
 use std::f32;
 use std::f32::consts::PI;
 
-use num::Complex;
+use num_complex::Complex;
 
 pub fn reverse_bits(val: usize, power: usize) -> usize {
   let mut reversed = 0;

@@ -17,7 +17,7 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-use num::complex::Complex;
+use num_complex::Complex;
 use std::f32;
 use std::fs::File;
 use std::io::BufWriter;
