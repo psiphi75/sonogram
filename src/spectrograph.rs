@@ -107,15 +107,11 @@ impl SpecOptionsBuilder {
     // Can only handle 16 bit data
     // TODO: Add more data here
     if 16 != reader.spec().bits_per_sample {
-      panic!("Currently we can only handle 16 bits per sample in the audio source.");
+      return Err(SonogramError::InvalidCodec);
     }
 
     if self.channel > reader.spec().channels {
-      panic!(
-        "Channel set to {}, but the audio on has {} channel(s)",
-        self.channel,
-        reader.spec().channels
-      );
+      return Err(SonogramError::InvalidChannel);
     }
 
     let data: Vec<i16> = {
@@ -170,15 +166,15 @@ impl SpecOptionsBuilder {
   ///
   ///  * `divisor` - How much to reduce the data by.
   ///
-  pub fn downsample(&mut self, divisor: usize) -> &mut Self {
+  pub fn downsample(&mut self, divisor: usize) -> Result<&mut Self, SonogramError> {
     if divisor == 0 {
-      panic!("The divisor is too small");
+      return Err(SonogramError::InvalidDivisor);
     }
     if divisor == 1 {
-      return self;
+      return Ok(self);
     }
     if self.data.is_empty() {
-      panic!("Need to load the data before calling downsample");
+      return Err(SonogramError::IncompleteData);
     }
 
     for (j, i) in (0..self.data.len() - divisor).step_by(divisor).enumerate() {
@@ -193,15 +189,16 @@ impl SpecOptionsBuilder {
     self.data.resize(self.data.len() / divisor, 0.0);
     self.sample_rate /= divisor as u32;
 
-    self
+    Ok(self)
   }
 
-  pub fn channel(&mut self, channel: u16) -> &mut Self {
+  pub fn channel(&mut self, channel: u16) -> Result<&mut Self, SonogramError> {
     if channel == 0 {
-      panic!("The channel must be an integer 1 or greater");
+      // The channel must be an integer 1 or greater
+      return Err(SonogramError::InvalidChannel);
     }
     self.channel = channel;
-    self
+    Ok(self)
   }
 
   pub fn set_verbose(&mut self) -> &mut Self {
@@ -225,18 +222,19 @@ impl SpecOptionsBuilder {
     self
   }
 
-  pub fn scale(&mut self, scale_factor: f32) -> &mut Self {
+  pub fn scale(&mut self, scale_factor: f32) -> Result<&mut Self, SonogramError> {
     if self.data.is_empty() {
-      panic!("Need to load the data before calling scale");
+      // Need to load the data before calling scale
+      return Err(SonogramError::IncompleteData);
     }
 
     // Don't need to scale 1.0
     if scale_factor == 1.0 {
-      return self;
+      return Ok(self);
     }
 
     self.data = self.data.iter().map(|x| x * scale_factor).collect();
-    self
+    Ok(self)
   }
 
   pub fn to_db(&mut self) -> &mut Self {
@@ -245,11 +243,11 @@ impl SpecOptionsBuilder {
   }
 
   /// Last method to be called.  This will calculate the colour gradients and
-  /// generate an instance of `Spectrograph`.
-  ///
-  pub fn build(&self) -> Spectrograph {
+  /// generate an instance of [Spectrograph].
+  pub fn build(&self) -> Result<Spectrograph, SonogramError> {
     if self.data.is_empty() {
-      panic!("SpecOptionsBuilder requires data to be loaded")
+      // SpecOptionsBuilder requires data to be loaded
+      return Err(SonogramError::IncompleteData);
     }
 
     let audio_length_sec = self.data.len() as u32 / self.sample_rate;
@@ -257,7 +255,7 @@ impl SpecOptionsBuilder {
       println!("Length (s): {}", audio_length_sec);
     }
 
-    Spectrograph {
+    Ok(Spectrograph {
       width: self.width,
       height: self.height,
       data: self.data.clone(), // TODO: There's probably more efficient ways of doing this
@@ -265,7 +263,7 @@ impl SpecOptionsBuilder {
       spectrogram: vec![vec![]],
       gradient: self.gradient.clone(),
       verbose: self.verbose,
-    }
+    })
   }
 }
 

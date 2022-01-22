@@ -5,6 +5,12 @@ use std::io;
 pub enum SonogramError {
   Io(io::Error),
   Hound(hound::Error),
+
+  // Our own errors
+  InvalidCodec,
+  InvalidChannel,
+  InvalidDivisor,
+  IncompleteData,
 }
 
 impl From<io::Error> for SonogramError {

@@ -251,13 +251,16 @@ fn main() {
   spec_builder
     .set_window_fn(window_fn)
     .channel(channel)
+    .unwrap()
     .load_data_from_file(std::path::Path::new(wav_file))
     .unwrap()
     .downsample(downsample)
+    .unwrap()
     .set_gradient(gradient)
-    .scale(scale);
+    .scale(scale)
+    .unwrap();
 
-  let mut spectrograph = spec_builder.build();
+  let mut spectrograph = spec_builder.build().unwrap();
 
   //
   // Do the spectrograph
