@@ -20,7 +20,7 @@
 use std::f32;
 use std::f32::consts::PI;
 
-use num_complex::Complex;
+use rustfft::num_complex::Complex;
 
 pub fn reverse_bits(val: usize, power: usize) -> usize {
   let mut reversed = 0;
@@ -33,15 +33,15 @@ pub fn reverse_bits(val: usize, power: usize) -> usize {
   reversed
 }
 
-pub fn rectangular(_n: u32, _samples: u32) -> f32 {
+pub fn rectangular(_n: usize, _samples: usize) -> f32 {
   1.0
 }
 
-pub fn hann_function(n: u32, samples: u32) -> f32 {
+pub fn hann_function(n: usize, samples: usize) -> f32 {
   0.5 * (1.0 - f32::cos((2.0 * PI * n as f32) / (samples as f32 - 1.0)))
 }
 
-pub fn blackman_harris(n: u32, samples: u32) -> f32 {
+pub fn blackman_harris(n: usize, samples: usize) -> f32 {
   const A0: f32 = 0.35875;
   const A1: f32 = 0.48829;
   const A2: f32 = 0.14128;

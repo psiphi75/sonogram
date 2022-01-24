@@ -13,7 +13,8 @@ categories = ["multimedia::images", "science", "multimedia::audio", "visualizati
 
 [dependencies]
 hound = "3.4"
-num-complex = "0.4"
+#num-complex = "0.4"
 clap = "2.33"
 png = "0.14"
 csv = "1.1"
+rustfft = "6.0"

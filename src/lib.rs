@@ -20,14 +20,16 @@
 extern crate csv;
 extern crate png;
 
+mod builder;
 mod colour_gradient;
 mod errors;
 mod freq_scales;
 mod spectrograph;
 mod utility;
 
+pub use builder::SpecOptionsBuilder;
 pub use colour_gradient::{ColourGradient, ColourTheme, RGBAColour};
 pub use errors::SonogramError;
 pub use freq_scales::FrequencyScale;
-pub use spectrograph::{SpecOptionsBuilder, Spectrograph};
+pub use spectrograph::Spectrograph;
 pub use utility::*;
