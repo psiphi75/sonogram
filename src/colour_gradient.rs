@@ -1,3 +1,5 @@
+use rustfft::num_traits::Pow;
+
 /*
  * Copyright (C) Simon Werner, 2019
  *
@@ -52,6 +54,7 @@ pub struct ColourGradient {
   colours: Vec<RGBAColour>,
   min: f32,
   max: f32,
+  is_db: bool,
 }
 
 impl ColourGradient {
@@ -60,6 +63,7 @@ impl ColourGradient {
       colours: vec![],
       min: 0.0,
       max: 1.0,
+      is_db: false,
     }
   }
 
@@ -121,7 +125,7 @@ impl ColourGradient {
     result
   }
 
-  pub fn get_colour(&self, value: f32) -> RGBAColour {
+  pub fn get_colour(&self, mut value: f32) -> RGBAColour {
     assert!(self.colours.len() > 1);
     assert!(self.max >= self.min);
 
@@ -134,13 +138,22 @@ impl ColourGradient {
 
     // Get the scaled values and indexes to lookup the colour
     let range = self.max - self.min;
-    let scaled_value = value / range * (self.colours.len() as f32 - 1.0);
+    let scaled_value = value.abs() / range * (self.colours.len() as f32 - 1.0);
     let idx_value = scaled_value.floor() as usize;
     let ratio = scaled_value - idx_value as f32;
 
+    let (i, j) = if self.is_db {
+      (
+        self.colours.len() - idx_value - 1,
+        self.colours.len() - idx_value - 2,
+      )
+    } else {
+      (idx_value, idx_value + 1)
+    };
+
     // Get the colour band
-    let first = self.colours[idx_value].clone();
-    let second = self.colours[idx_value + 1].clone();
+    let first = self.colours[i].clone();
+    let second = self.colours[j].clone();
 
     RGBAColour {
       r: self.interpolate(first.r, second.r, ratio),
@@ -148,6 +161,22 @@ impl ColourGradient {
       b: self.interpolate(first.b, second.b, ratio),
       a: self.interpolate(first.a, second.a, ratio),
     }
+  }
+
+  pub fn to_legend(&self, width: usize, height: usize) -> Vec<RGBAColour> {
+    let mut result = vec![RGBAColour::new(0, 0, 0, 0); width * height];
+    let step = -(self.max - self.min) / (height as f32 - 1.0);
+    let mut val = self.max;
+    let mut i = 0;
+    for _ in 0..height {
+      let col = self.get_colour(val);
+      val += step;
+      for _ in 0..width {
+        result[i] = col.clone();
+        i += 1;
+      }
+    }
+    result
   }
 
   pub fn add_colour(&mut self, colour: RGBAColour) {
@@ -158,12 +187,16 @@ impl ColourGradient {
     ((f32::from(finish) - f32::from(start)) * ratio + f32::from(start)).round() as u8
   }
 
+  pub fn set_db_scale(&mut self, is_db: bool) {
+    self.is_db = is_db;
+  }
+
   pub fn set_max(&mut self, max: f32) {
-    self.max = max
+    self.max = max;
   }
 
   pub fn set_min(&mut self, min: f32) {
-    self.min = min
+    self.min = min;
   }
 }
 
@@ -212,6 +245,26 @@ mod tests {
     );
     assert_eq!(
       gradient.get_colour(0.75),
+      RGBAColour::new(128, 128, 128, 255)
+    );
+  }
+
+  #[test]
+  fn test_min_max() {
+    let mut gradient = ColourGradient::new();
+
+    gradient.add_colour(RGBAColour::new(0, 0, 0, 255));
+    gradient.add_colour(RGBAColour::new(255, 255, 255, 255));
+    gradient.set_db_scale(true);
+
+    // Test two colours
+    assert_eq!(gradient.get_colour(-15.0), RGBAColour::new(0, 0, 0, 255));
+    assert_eq!(
+      gradient.get_colour(1.0),
+      RGBAColour::new(255, 255, 255, 255)
+    );
+    assert_eq!(
+      gradient.get_colour(0.5),
       RGBAColour::new(128, 128, 128, 255)
     );
   }

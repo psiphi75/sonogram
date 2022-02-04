@@ -20,18 +20,7 @@
 use std::f32;
 use std::f32::consts::PI;
 
-use rustfft::num_complex::Complex;
-
-pub fn reverse_bits(val: usize, power: usize) -> usize {
-  let mut reversed = 0;
-
-  for i in 0..power {
-    let cur_bit = if (1 << i) & val > 0 { 1 } else { 0 };
-    reversed |= cur_bit << (power - i - 1);
-  }
-
-  reversed
-}
+pub type WindowFn = fn(usize, usize) -> f32;
 
 pub fn rectangular(_n: usize, _samples: usize) -> f32 {
   1.0
@@ -52,27 +41,6 @@ pub fn blackman_harris(n: usize, samples: usize) -> f32 {
   A0 - A1 * f32::cos(arg) + A2 * f32::cos(2.0 * arg) - A3 * f32::cos(3.0 * arg)
 }
 
-pub fn pad_to_power2(signal: &mut Vec<Complex<f32>>, min_len: usize) -> usize {
-  let mut power = 1;
-  let mut new_len = 2;
-
-  while new_len < min_len {
-    new_len *= 2;
-    power += 1;
-  }
-  pad(signal, new_len);
-  let padding = &mut vec![Complex::new(0.0, 0.0); new_len - signal.len()];
-  signal.append(padding);
-
-  power
-}
-
-pub fn pad(signal: &mut Vec<Complex<f32>>, new_len: usize) {
-  if new_len > signal.len() {
-    signal.resize_with(new_len, || Complex::new(0.0, 0.0));
-  }
-}
-
 ///
 /// Integrate `spec` from `y1` to `y2`, where `y1` and `y2` are
 /// floating point indicies where we take the fractional component into
@@ -90,25 +58,28 @@ pub fn pad(signal: &mut Vec<Complex<f32>>, new_len: usize) {
 ///
 /// The integrated complex value.
 ///
-pub fn integrate(y1: f32, y2: f32, spec: &[Complex<f32>]) -> Complex<f32> {
-  let i_y1 = y1.floor() as usize;
-  let i_y2 = y2.floor() as usize;
-  let f_y1 = y1.fract();
-  let f_y2 = y2.fract();
+pub fn integrate(x1: f32, x2: f32, spec: &[f32]) -> f32 {
+  let mut i_x1 = x1.floor() as usize;
+  let i_x2 = (x2 - 0.000001).floor() as usize;
 
   // Calculate the ratio from
-  let ratio = |v1, v2, frac| (v2 - v1) * (frac);
+  let area = |y, frac| y * frac;
 
-  if i_y1 == i_y2 {
+  if i_x1 >= i_x2 {
     // Sub-cell integration
-    ratio(spec[i_y1], spec[i_y1 + 1], f_y2 - f_y1)
+    area(spec[i_x1], x2 - x1)
   } else {
-    // Need to integrate from y1 to y2 over multiple indicies.
-    let mut result = ratio(spec[i_y1], spec[i_y1 + 1], 1.0 - f_y1);
-    for c in spec.iter().take(i_y2).skip(i_y1 + 1) {
-      result += c;
+    // Need to integrate from x1 to x2 over multiple indicies.
+    let mut result = area(spec[i_x1], (i_x1 + 1) as f32 - x1);
+    i_x1 += 1;
+    while i_x1 < i_x2 {
+      result += spec[i_x1];
+      i_x1 += 1;
     }
-    result += ratio(spec[i_y2], spec[i_y2 + 1], f_y2);
+    if i_x1 >= spec.len() {
+      i_x1 = spec.len() - 1;
+    }
+    result += area(spec[i_x1], x2 - i_x1 as f32);
     result
   }
 }
@@ -119,26 +90,34 @@ mod tests {
 
   #[test]
   fn test_integrate() {
-    let v = vec![
-      Complex::new(0.0, 0.0),
-      Complex::new(1.0, 0.0),
-      Complex::new(2.0, 0.0),
-      Complex::new(4.0, 0.0),
-    ];
+    let v = vec![1.0, 2.0, 4.0, 1.123];
+
+    // No x distance
+    let c = integrate(0.0, 0.0, &v);
+    assert!((c - 0.0).abs() < 0.0001);
 
     // No number boundary
-    let c = integrate(0.6, 0.8, &v);
-    assert!((c.norm() - 0.2) < 0.0001);
+    let c = integrate(0.25, 1.0, &v);
+    assert!((c - 0.75).abs() < 0.0001);
 
-    let c = integrate(1.000001, 1.999999, &v);
-    assert!((c.norm() - 1.0) < 0.001);
+    let c = integrate(0.0, 1.0, &v);
+    assert!((c - 1.0).abs() < 0.0001);
 
-    // One number boundary
-    let c = integrate(1.6, 2.2, &v);
-    assert!((c.norm() - 0.8) < 0.0001);
+    let c = integrate(3.75, 4.0, &v);
+    assert!((c - 1.123 / 4.0).abs() < 0.0001);
 
-    // Two number boundary
-    let c = integrate(0.00001, 2.99999, &v);
-    assert!((c.norm() - 7.0) < 0.0001);
+    let c = integrate(0.5, 1.0, &v);
+    assert!((c - 0.5).abs() < 0.0001);
+
+    // Accross one boundary
+    let c = integrate(0.75, 1.25, &v);
+    assert!((c - 0.75).abs() < 0.0001);
+
+    let c = integrate(1.8, 2.6, &v);
+    assert!((c - 2.8).abs() < 0.0001);
+
+    // Full Range
+    let c = integrate(0.0, 4.0, &v);
+    assert!((c - 8.123).abs() < 0.0001);
   }
 }
