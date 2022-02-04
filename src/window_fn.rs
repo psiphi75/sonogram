@@ -23,22 +23,22 @@ use std::f32::consts::PI;
 pub type WindowFn = fn(usize, usize) -> f32;
 
 pub fn rectangular(_n: usize, _samples: usize) -> f32 {
-  1.0
+    1.0
 }
 
 pub fn hann_function(n: usize, samples: usize) -> f32 {
-  0.5 * (1.0 - f32::cos((2.0 * PI * n as f32) / (samples as f32 - 1.0)))
+    0.5 * (1.0 - f32::cos((2.0 * PI * n as f32) / (samples as f32 - 1.0)))
 }
 
 pub fn blackman_harris(n: usize, samples: usize) -> f32 {
-  const A0: f32 = 0.35875;
-  const A1: f32 = 0.48829;
-  const A2: f32 = 0.14128;
-  const A3: f32 = 0.01168;
+    const A0: f32 = 0.35875;
+    const A1: f32 = 0.48829;
+    const A2: f32 = 0.14128;
+    const A3: f32 = 0.01168;
 
-  let arg = 2.0 * PI * n as f32 / (samples as f32 - 1.0);
+    let arg = 2.0 * PI * n as f32 / (samples as f32 - 1.0);
 
-  A0 - A1 * f32::cos(arg) + A2 * f32::cos(2.0 * arg) - A3 * f32::cos(3.0 * arg)
+    A0 - A1 * f32::cos(arg) + A2 * f32::cos(2.0 * arg) - A3 * f32::cos(3.0 * arg)
 }
 
 ///
@@ -59,65 +59,65 @@ pub fn blackman_harris(n: usize, samples: usize) -> f32 {
 /// The integrated complex value.
 ///
 pub fn integrate(x1: f32, x2: f32, spec: &[f32]) -> f32 {
-  let mut i_x1 = x1.floor() as usize;
-  let i_x2 = (x2 - 0.000001).floor() as usize;
+    let mut i_x1 = x1.floor() as usize;
+    let i_x2 = (x2 - 0.000001).floor() as usize;
 
-  // Calculate the ratio from
-  let area = |y, frac| y * frac;
+    // Calculate the ratio from
+    let area = |y, frac| y * frac;
 
-  if i_x1 >= i_x2 {
-    // Sub-cell integration
-    area(spec[i_x1], x2 - x1)
-  } else {
-    // Need to integrate from x1 to x2 over multiple indicies.
-    let mut result = area(spec[i_x1], (i_x1 + 1) as f32 - x1);
-    i_x1 += 1;
-    while i_x1 < i_x2 {
-      result += spec[i_x1];
-      i_x1 += 1;
+    if i_x1 >= i_x2 {
+        // Sub-cell integration
+        area(spec[i_x1], x2 - x1)
+    } else {
+        // Need to integrate from x1 to x2 over multiple indicies.
+        let mut result = area(spec[i_x1], (i_x1 + 1) as f32 - x1);
+        i_x1 += 1;
+        while i_x1 < i_x2 {
+            result += spec[i_x1];
+            i_x1 += 1;
+        }
+        if i_x1 >= spec.len() {
+            i_x1 = spec.len() - 1;
+        }
+        result += area(spec[i_x1], x2 - i_x1 as f32);
+        result
     }
-    if i_x1 >= spec.len() {
-      i_x1 = spec.len() - 1;
-    }
-    result += area(spec[i_x1], x2 - i_x1 as f32);
-    result
-  }
 }
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+    use super::*;
 
-  #[test]
-  fn test_integrate() {
-    let v = vec![1.0, 2.0, 4.0, 1.123];
+    #[test]
+    fn test_integrate() {
+        let v = vec![1.0, 2.0, 4.0, 1.123];
 
-    // No x distance
-    let c = integrate(0.0, 0.0, &v);
-    assert!((c - 0.0).abs() < 0.0001);
+        // No x distance
+        let c = integrate(0.0, 0.0, &v);
+        assert!((c - 0.0).abs() < 0.0001);
 
-    // No number boundary
-    let c = integrate(0.25, 1.0, &v);
-    assert!((c - 0.75).abs() < 0.0001);
+        // No number boundary
+        let c = integrate(0.25, 1.0, &v);
+        assert!((c - 0.75).abs() < 0.0001);
 
-    let c = integrate(0.0, 1.0, &v);
-    assert!((c - 1.0).abs() < 0.0001);
+        let c = integrate(0.0, 1.0, &v);
+        assert!((c - 1.0).abs() < 0.0001);
 
-    let c = integrate(3.75, 4.0, &v);
-    assert!((c - 1.123 / 4.0).abs() < 0.0001);
+        let c = integrate(3.75, 4.0, &v);
+        assert!((c - 1.123 / 4.0).abs() < 0.0001);
 
-    let c = integrate(0.5, 1.0, &v);
-    assert!((c - 0.5).abs() < 0.0001);
+        let c = integrate(0.5, 1.0, &v);
+        assert!((c - 0.5).abs() < 0.0001);
 
-    // Accross one boundary
-    let c = integrate(0.75, 1.25, &v);
-    assert!((c - 0.75).abs() < 0.0001);
+        // Accross one boundary
+        let c = integrate(0.75, 1.25, &v);
+        assert!((c - 0.75).abs() < 0.0001);
 
-    let c = integrate(1.8, 2.6, &v);
-    assert!((c - 2.8).abs() < 0.0001);
+        let c = integrate(1.8, 2.6, &v);
+        assert!((c - 2.8).abs() < 0.0001);
 
-    // Full Range
-    let c = integrate(0.0, 4.0, &v);
-    assert!((c - 8.123).abs() < 0.0001);
-  }
+        // Full Range
+        let c = integrate(0.0, 4.0, &v);
+        assert!((c - 8.123).abs() < 0.0001);
+    }
 }
