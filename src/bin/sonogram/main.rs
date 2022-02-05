@@ -18,267 +18,175 @@
 extern crate clap;
 extern crate sonogram;
 
-use std::{fs::File, io::BufWriter};
+use std::{fs::File, io::BufWriter, path::PathBuf};
 
-use clap::{App, Arg};
+use clap::{ArgEnum, Parser};
 use png::HasParameters;
 use sonogram::{ColourGradient, ColourTheme, FrequencyScale, SpecOptionsBuilder};
 
-const STR_ERR_NUM_BINS: &str = "Invalid chunk_len value, it must be an integer greater than 16";
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
+enum WinFunc {
+    BlackmanHarris,
+    Rectangular,
+    Hann,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
+enum ArgColourTheme {
+    Default,
+    Audacity,
+    Rainbow,
+    BlackWhite,
+    WhiteBlack,
+}
+
+impl From<ArgColourTheme> for ColourTheme {
+    fn from(other: ArgColourTheme) -> ColourTheme {
+        match other {
+            ArgColourTheme::Default => ColourTheme::Default,
+            ArgColourTheme::Audacity => ColourTheme::Audacity,
+            ArgColourTheme::Rainbow => ColourTheme::Rainbow,
+            ArgColourTheme::BlackWhite => ColourTheme::BlackWhite,
+            ArgColourTheme::WhiteBlack => ColourTheme::WhiteBlack,
+        }
+    }
+}
+
+/// sonogram - create a spectrogram as a PNG file from a wav file.
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    //
+    // INPUT options
+    //
+    /// The .wav file to process
+    #[clap(long, parse(from_os_str), value_name = "FILE")]
+    wav: PathBuf,
+
+    /// The audio channel to use
+    #[clap(short, long, default_value_t = 1)]
+    channel: u16,
+
+    /// Downsample the .wav by this factor
+    #[clap(long, default_value_t = 1)]
+    downsample: usize,
+
+    //
+    // Time domain to frequency domain transformation options
+    //
+    /// The number of FFT bins to use
+    #[clap(short, long, default_value_t = 2048)]
+    bins: usize,
+
+    /// The windowing function to use
+    #[clap(arg_enum, long, default_value_t = WinFunc::Hann)]
+    window_fn: WinFunc,
+
+    /// The type of scale to use for frequency [possible values: log, linear]
+    #[clap(long, default_value_t = String::from("linear"), value_name = "TYPE")]
+    freq_scale: String,
+
+    /// The number of samples to step for each window, zero mean default
+    #[clap(long, default_value_t = 0)]
+    stepsize: usize,
+    //
+    // Output
+    //
+    /// The output PNG file
+    #[clap(long, parse(from_os_str), value_name = "FILE")]
+    png: Option<PathBuf>,
+
+    /// Output the gradient legend to a PNG file
+    #[clap(long, parse(from_os_str), value_name = "FILE")]
+    legend: Option<PathBuf>,
+
+    /// The output CSV file
+    #[clap(long, parse(from_os_str), value_name = "FILE")]
+    csv: Option<PathBuf>,
+
+    /// The width of the output image in pixels
+    #[clap(short, long, default_value_t = 512, value_name = "PIXELS")]
+    width: usize,
+
+    /// The height of the output image in pixels
+    #[clap(short, long, default_value_t = 512, value_name = "PIXELS")]
+    height: usize,
+
+    /// The colour gradient to implement
+    #[clap(arg_enum, long, default_value_t = ArgColourTheme::Default, value_name = "GRADIENT")]
+    gradient: ArgColourTheme,
+}
 
 fn main() {
-    let matches = App::new("sonogram")
-        .version(env!("CARGO_PKG_VERSION"))
-        .author("Simon Werner <simonwerner@gmail.com>")
-        .about("sonogram - create a spectrogram as a PNG file from a wav file.")
-        //
-        // INPUT options
-        //
-        .arg(
-            Arg::with_name("wav")
-                .short("w")
-                .long("wav")
-                .value_name("FILE")
-                .help("The input file, a .wav")
-                .required(true)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("channel")
-                .short("n")
-                .long("channel")
-                .value_name("NUM")
-                .help("The audio channel to use")
-                .default_value("1")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("downsample")
-                .short("d")
-                .long("downsample")
-                .value_name("NUM")
-                .help("Downsample the .wav by this factor")
-                .default_value("1")
-                .takes_value(true),
-        )
-        //
-        // Time domain to frequency domain transformation options
-        //
-        .arg(
-            Arg::with_name("bins")
-                .long("bins")
-                .value_name("NUM")
-                .help("The length of each audio chunk to process, in samples")
-                .default_value("2048")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("window-function")
-                .short("f")
-                .long("window-function")
-                .value_name("FUNC NAME")
-                .help("The windowing function to use")
-                .possible_values(&["blackman_harris", "rectangular", "hann"])
-                .default_value("rectangular")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("freq-scale")
-                .long("freq-scale")
-                .value_name("TYPE")
-                .help("The type of scale to use for frequency")
-                .default_value("linear")
-                .possible_values(&["linear", "log"])
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("stepsize")
-                .long("stepsize")
-                .value_name("SAMPLES")
-                .help("The number of samples to step for each window")
-                .default_value("0")
-                .takes_value(true),
-        )
-        //
-        // Output
-        //
-        .arg(
-            Arg::with_name("png")
-                .short("p")
-                .long("png")
-                .value_name("FILE")
-                .help("The output PNG file")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("legend")
-                .short("l")
-                .long("legend")
-                .value_name("FILE")
-                .help("Output the gradient legend to a PNG file")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("csv")
-                .short("c")
-                .long("csv")
-                .value_name("FILE")
-                .help("The output CSV file")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("width")
-                .long("width")
-                .short("x")
-                .value_name("PIXELS")
-                .help("The width of the output image in pixels")
-                .default_value("256")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("height")
-                .long("height")
-                .short("y")
-                .value_name("PIXELS")
-                .help("The height of the output image in pixels")
-                .default_value("256")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("gradient")
-                .long("gradient")
-                .short("g")
-                .value_name("NAME")
-                .help("The colour gradient to implement")
-                .default_value("default")
-                .possible_values(&[
-                    "default",
-                    "audacity",
-                    "rainbow",
-                    "black-white",
-                    "white-black",
-                ])
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("quiet")
-                .short("q")
-                .long("quiet")
-                .help("No console output")
-                .takes_value(false),
-        )
-        .get_matches();
+    let args = Args::parse();
 
     //
-    // Get the cli options
+    // Assert the CLI options
     //
-    let wav_file = matches.value_of("wav").unwrap();
-
-    if !matches.is_present("png") && !matches.is_present("csv") {
+    if args.png.is_none() && args.csv.is_none() {
         panic!("Need to provide either a CSV or PNG output");
     }
 
-    let downsample = match matches.value_of("downsample").unwrap().parse::<usize>() {
-        Ok(n) => n,
-        Err(_) => panic!("Invalid downsample value, it must be an integer greater than 1"),
-    };
-    let channel = match matches.value_of("channel").unwrap().parse::<u16>() {
-        Ok(n) => n,
-        Err(_) => panic!("Invalid channel value, it must be an integer greater than 1"),
-    };
-    let width = match matches.value_of("width").unwrap().parse::<usize>() {
-        Ok(n) => n,
-        Err(_) => panic!("Invalid width value, it must be an integer greater than 1"),
-    };
-    let height = match matches.value_of("height").unwrap().parse::<usize>() {
-        Ok(n) => n,
-        Err(_) => panic!("Invalid height value, it must be an integer greater than 1"),
-    };
-    let freq_scale = match matches.value_of("freq-scale").unwrap() {
+    let freq_scale = match args.freq_scale.as_str() {
         "linear" => FrequencyScale::Linear,
         "log" => FrequencyScale::Log,
         _ => panic!("Invalid window function"),
     };
-    let num_bins = match matches.value_of("bins").unwrap().parse::<usize>() {
-        Ok(n) => {
-            if n <= 16 {
-                panic!("{}", STR_ERR_NUM_BINS)
-            } else {
-                n
-            }
-        }
-        Err(_) => panic!("{}", STR_ERR_NUM_BINS),
-    };
-    let window_fn = match matches.value_of("window-function").unwrap() {
-        "blackman_harris" => sonogram::blackman_harris,
-        "rectangular" => sonogram::rectangular,
-        "hann" => sonogram::hann_function,
-        _ => panic!("Invalid window function"),
-    };
-    let step_size = match matches.value_of("stepsize").unwrap().parse::<usize>() {
-        Ok(n) => {
-            if n == 0 {
-                num_bins
-            } else {
-                n
-            }
-        }
-        Err(_) => panic!("Invalid stepsize value, it must be an integer greater than 0"),
+
+    if args.bins < 16 {
+        panic!(
+            "Invalid bins value ({}), it must be an integer greater than 16",
+            args.bins
+        );
+    }
+
+    let window_fn = match args.window_fn {
+        WinFunc::BlackmanHarris => sonogram::blackman_harris,
+        WinFunc::Rectangular => sonogram::rectangular,
+        WinFunc::Hann => sonogram::hann_function,
     };
 
-    let verbose = !matches.is_present("quiet");
-
-    let mut gradient = match matches.value_of("gradient").unwrap() {
-        "default" => ColourGradient::create(ColourTheme::Default),
-        "audacity" => ColourGradient::create(ColourTheme::Audacity),
-        "rainbow" => ColourGradient::create(ColourTheme::Rainbow),
-        "black-white" => ColourGradient::create(ColourTheme::BlackWhite),
-        "white-black" => ColourGradient::create(ColourTheme::WhiteBlack),
-        c => panic!("Invalid colour: {}", c),
-    };
+    let mut gradient = ColourGradient::create(ColourTheme::from(args.gradient));
 
     //
     // Apply the options
     //
-    let spec_builder = SpecOptionsBuilder::new(num_bins)
-        .load_data_from_file(std::path::Path::new(wav_file))
+    let spec_builder = SpecOptionsBuilder::new(args.bins)
+        .load_data_from_file(&args.wav)
         .unwrap()
-        .set_verbose(verbose)
-        .channel(channel)
-        .downsample(downsample)
+        .channel(args.channel)
+        .downsample(args.downsample)
         .set_window_fn(window_fn)
-        .set_step_size(step_size);
+        .set_step_size(args.stepsize);
 
     //
     // Do the spectrograph
     //
     let mut spectrograph = spec_builder.build().unwrap().compute();
 
-    if matches.is_present("png") {
-        let png_file = matches.value_of("png").unwrap();
+    if args.png.is_some() {
         spectrograph
-            .to_png(std::path::Path::new(png_file), freq_scale, &mut gradient, width, height)
+            .to_png(
+                &args.png.unwrap(),
+                freq_scale,
+                &mut gradient,
+                args.width,
+                args.height,
+            )
             .unwrap()
     }
 
-    if matches.is_present("csv") {
-        let csv_file = matches.value_of("csv").unwrap();
+    if args.csv.is_some() {
         spectrograph
-            .to_csv(std::path::Path::new(csv_file), freq_scale, width, height)
+            .to_csv(&args.csv.unwrap(), freq_scale, args.width, args.height)
             .unwrap()
     }
 
-    if matches.is_present("legend") {
+    if args.legend.is_some() {
         let (min, max) = spectrograph.get_min_max();
         gradient.set_min(min);
         gradient.set_max(max);
 
-
-        let legend_file = matches.value_of("legend").unwrap();
         let width = 20;
         let height = 250;
         let legend = gradient.to_legend(width, height);
@@ -292,7 +200,7 @@ fn main() {
             img[i * 4 + 3] = colour[3];
         }
 
-        let file = File::create(legend_file).unwrap();
+        let file = File::create(&args.legend.unwrap()).unwrap();
         let buf = &mut BufWriter::new(file);
         let mut encoder = png::Encoder::new(buf, width as u32, height as u32);
         encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);

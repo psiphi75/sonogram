@@ -52,9 +52,6 @@ pub struct SpecOptionsBuilder {
     num_bins: usize,     // The number of FFT bins
     step_size: usize,    // How far to step between each window function
     window_fn: WindowFn, // The windowing function to use.
-
-    // Other
-    verbose: bool, // Do we print out stats and things
 }
 
 impl SpecOptionsBuilder {
@@ -71,7 +68,6 @@ impl SpecOptionsBuilder {
             data: vec![],
             sample_rate: 11025,
             channel: 1,
-            verbose: false,
             scale_factor: None,
             do_normalise: false,
             downsample_divisor: None,
@@ -190,11 +186,6 @@ impl SpecOptionsBuilder {
         self
     }
 
-    pub fn set_verbose(mut self, verbose: bool) -> Self {
-        self.verbose = verbose;
-        self
-    }
-
     /// Last method to be called.  This will calculate the colour gradients and
     /// generate an instance of [Spectrograph].
     pub fn build(mut self) -> Result<SpecCompute, SonogramError> {
@@ -257,11 +248,6 @@ impl SpecOptionsBuilder {
             for x in self.data.iter_mut() {
                 *x *= scale_factor;
             }
-        }
-
-        let audio_length_sec = self.data.len() as u32 / self.sample_rate;
-        if self.verbose {
-            println!("Length (s): {}", audio_length_sec);
         }
 
         Ok(SpecCompute::new(
