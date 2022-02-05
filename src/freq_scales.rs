@@ -39,25 +39,25 @@ impl FreqScaler {
     /// # Arguments
     ///
     /// * `freq_scale` - The [FrequencyScale] to implement.
-    /// * `height_orig` - the half the data length, i.e. the nyquist frequency.
-    /// * `height_new` - The output grid/image height in cells/pixels.
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
     pub fn create(
         freq_scale: FrequencyScale,
-        height_orig: usize,
-        height_new: usize,
+        f_max_orig: usize,
+        f_max_new: usize,
     ) -> Box<dyn FreqScalerTrait> {
         match freq_scale {
             FrequencyScale::Linear => {
-                Box::new(LinearFreq::init(height_orig as f32, height_new as f32))
+                Box::new(LinearFreq::init(f_max_orig as f32, f_max_new as f32))
             }
-            FrequencyScale::Log => Box::new(LogFreq::init(height_orig as f32, height_new as f32)),
+            FrequencyScale::Log => Box::new(LogFreq::init(f_max_orig as f32, f_max_new as f32)),
         }
     }
 }
 
 pub trait FreqScalerTrait {
     /// Initialise the scaler object, can put cached values here.
-    fn init(height_orig: f32, height: f32) -> Self
+    fn init(f_max_orig: f32, height: f32) -> Self
     where
         Self: Sized;
 
@@ -75,12 +75,12 @@ impl FreqScalerTrait for LinearFreq {
     ///
     /// # Arguments
     ///
-    /// * `height_orig` - the half the data length, i.e. the nyquist frequency.
-    /// * `height_new` - The output grid/image height in cells/pixels.
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
     ///
-    fn init(height_orig: f32, height_new: f32) -> Self {
+    fn init(f_max_orig: f32, f_max_new: f32) -> Self {
         Self {
-            ratio: height_orig / height_new,
+            ratio: f_max_orig / f_max_new,
         }
     }
 
@@ -88,8 +88,8 @@ impl FreqScalerTrait for LinearFreq {
     ///
     /// # Arguments
     ///
-    /// * `height_orig` - the half the data length, i.e. the nyquist frequency.
-    /// * `height_new` - The output grid/image height in cells/pixels.
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
     ///
     /// # Returns
     ///
@@ -106,8 +106,6 @@ impl FreqScalerTrait for LinearFreq {
 /// Scale the frequncy to a Log (base E) frequency scale.
 ///
 pub struct LogFreq {
-    height_orig: f32,
-    height_new: f32,
     log_coef: f32,
 }
 
@@ -117,14 +115,12 @@ impl FreqScalerTrait for LogFreq {
     ///
     /// # Arguments
     ///
-    /// * `height_orig` - the half the data length, i.e. the nyquist frequency.
-    /// * `height_new` - The output grid/image height in cells/pixels.
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
     ///
-    fn init(height_orig: f32, height_new: f32) -> Self {
+    fn init(f_max_orig: f32, f_max_new: f32) -> Self {
         Self {
-            height_orig,
-            height_new,
-            log_coef: 1.0 / (height_new + 1.0).ln() * height_orig,
+            log_coef: f_max_orig / f_max_new.ln(),
         }
     }
 
@@ -133,47 +129,16 @@ impl FreqScalerTrait for LogFreq {
     ///
     /// # Arguments
     ///
-    /// * `height_orig` - the half the data length, i.e. the nyquist frequency.
-    /// * `height_new` - The output grid/image height in cells/pixels.
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
     ///
     /// # Returns
     ///
     /// * A pair describing the lower bound and upper bound of the range
     ///
     fn scale(&self, y: usize) -> (f32, f32) {
-        let f1 = self.height_orig - (self.log_coef * (self.height_new + 1.0 - y as f32).ln());
-        let f2 = self.height_orig - (self.log_coef * (self.height_new + 1.0 - (y + 1) as f32).ln());
+        let f1 = self.log_coef * (y as f32).ln();
+        let f2 = self.log_coef * ((y + 1) as f32).ln();
         (f1, f2)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_linear_scale_down() {
-        let scale = LinearFreq::init(10.0, 5.0);
-
-        let (h1, h2) = scale.scale(0);
-        assert!((h1 - 0.0).abs() < 0.0001);
-        assert!((h2 - 0.5).abs() < 0.0001);
-
-        let (h1, h2) = scale.scale(6);
-        assert!((h1 - 3.0).abs() < 0.0001);
-        assert!((h2 - 3.5).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_linear_scale_up() {
-        let scale = LinearFreq::init(5.0, 10.0);
-
-        let (h1, h2) = scale.scale(0);
-        assert!((h1 - 0.0).abs() < 0.0001);
-        assert!((h2 - 2.0).abs() < 0.0001);
-
-        let (h1, h2) = scale.scale(6);
-        assert!((h1 - 12.0).abs() < 0.0001);
-        assert!((h2 - 14.0).abs() < 0.0001);
     }
 }

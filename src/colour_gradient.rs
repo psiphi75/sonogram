@@ -1,9 +1,5 @@
-use rustfft::num_traits::Pow;
-
 /*
- * Copyright (C) Simon Werner, 2019
- *
- * A Rust port of the original C++ code by Christian Briones, 2013.
+ * Copyright (C) Simon Werner, 2022
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -54,7 +50,6 @@ pub struct ColourGradient {
     colours: Vec<RGBAColour>,
     min: f32,
     max: f32,
-    is_db: bool,
 }
 
 impl ColourGradient {
@@ -63,7 +58,6 @@ impl ColourGradient {
             colours: vec![],
             min: 0.0,
             max: 1.0,
-            is_db: false,
         }
     }
 
@@ -125,8 +119,9 @@ impl ColourGradient {
         result
     }
 
-    pub fn get_colour(&self, mut value: f32) -> RGBAColour {
-        assert!(self.colours.len() > 1);
+    pub fn get_colour(&self, value: f32) -> RGBAColour {
+        let len = self.colours.len();
+        assert!(len > 1);
         assert!(self.max >= self.min);
 
         if value >= self.max {
@@ -137,19 +132,11 @@ impl ColourGradient {
         }
 
         // Get the scaled values and indexes to lookup the colour
-        let range = self.max - self.min;
-        let scaled_value = value.abs() / range * (self.colours.len() as f32 - 1.0);
+        let m = ((len - 1) as f32) / (self.max - self.min); // TODO: Precalc this value
+        let scaled_value = (value - self.min) * m;
         let idx_value = scaled_value.floor() as usize;
         let ratio = scaled_value - idx_value as f32;
-
-        let (i, j) = if self.is_db {
-            (
-                self.colours.len() - idx_value - 1,
-                self.colours.len() - idx_value - 2,
-            )
-        } else {
-            (idx_value, idx_value + 1)
-        };
+        let (i, j) = (idx_value, idx_value + 1);
 
         // Get the colour band
         let first = self.colours[i].clone();
@@ -185,10 +172,6 @@ impl ColourGradient {
 
     fn interpolate(&self, start: u8, finish: u8, ratio: f32) -> u8 {
         ((f32::from(finish) - f32::from(start)) * ratio + f32::from(start)).round() as u8
-    }
-
-    pub fn set_db_scale(&mut self, is_db: bool) {
-        self.is_db = is_db;
     }
 
     pub fn set_max(&mut self, max: f32) {
@@ -255,7 +238,6 @@ mod tests {
 
         gradient.add_colour(RGBAColour::new(0, 0, 0, 255));
         gradient.add_colour(RGBAColour::new(255, 255, 255, 255));
-        gradient.set_db_scale(true);
 
         // Test two colours
         assert_eq!(gradient.get_colour(-15.0), RGBAColour::new(0, 0, 0, 255));

@@ -28,11 +28,10 @@ mod window_fn;
 pub use builder::SpecOptionsBuilder;
 pub use colour_gradient::{ColourGradient, ColourTheme, RGBAColour};
 pub use errors::SonogramError;
-pub use freq_scales::FrequencyScale;
+pub use freq_scales::{FreqScaler, FrequencyScale};
 pub use spec_core::SpecCompute;
 pub use window_fn::*;
 
-use std::f32;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
@@ -44,7 +43,7 @@ use rgb::FromSlice;
 use png::HasParameters; // To use encoder.set()
 
 pub struct Spectrogram {
-    data: Vec<Vec<f32>>,
+    spec: Vec<f32>,
     width: usize,
     height: usize,
 }
@@ -63,26 +62,17 @@ impl Spectrogram {
         fname: &Path,
         freq_scale: FrequencyScale,
         gradient: &mut ColourGradient,
+        w_img: usize,
+        h_img: usize,
     ) -> Result<(), std::io::Error> {
-        let img_height = 512;
-        let result = self.spec_to_buffer(freq_scale, img_height);
+        let result = self.to_buffer(freq_scale, w_img, h_img);
 
-        // let height = self.height;
-        let width = result.len() / img_height as usize;
+        let (min, max) = get_min_max(&result);
+        gradient.set_min(min);
+        gradient.set_max(max);
 
-        println!(
-            "width={}, img_height={}, result.len={}",
-            width,
-            img_height,
-            result.len()
-        );
-
-        gradient.set_db_scale(true);
-        gradient.set_min(-80.0);
-        gradient.set_max(0.0);
-
-        let mut img: Vec<u8> = vec![0u8; width * img_height * 4];
-        for (i, val) in result.iter().take(width * img_height).enumerate() {
+        let mut img: Vec<u8> = vec![0u8; w_img * h_img * 4];
+        for (i, val) in result.iter().take(w_img * h_img).enumerate() {
             let value = *val;
             let colour = gradient.get_colour(value).to_vec();
             img[i * 4] = colour[0];
@@ -90,11 +80,10 @@ impl Spectrogram {
             img[i * 4 + 2] = colour[2];
             img[i * 4 + 3] = colour[3];
         }
-        println!("width={}", width);
 
         let file = File::create(fname)?;
         let w = &mut BufWriter::new(file);
-        let mut encoder = png::Encoder::new(w, width as u32, img_height as u32);
+        let mut encoder = png::Encoder::new(w, w_img as u32, h_img as u32);
         encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
         let mut writer = encoder.write_header()?;
         writer.write_image_data(&img)?; // Save
@@ -114,7 +103,9 @@ impl Spectrogram {
         freq_scale: FrequencyScale,
         gradient: ColourGradient,
     ) -> Result<Vec<u8>, std::io::Error> {
-        let result = self.spec_to_buffer(freq_scale, 512);
+        let img_height = 512;
+        let img_width = 512;
+        let result = self.to_buffer(freq_scale, img_width, img_height);
 
         let mut img: Vec<u8> = vec![0u8; result.len() * 4];
         for (i, val) in result.iter().enumerate() {
@@ -149,35 +140,27 @@ impl Spectrogram {
         &mut self,
         fname: &Path,
         freq_scale: FrequencyScale,
+        w_img: usize,
+        h_img: usize,
     ) -> Result<(), std::io::Error> {
-        let img_height = 512;
-        let result = self.spec_to_buffer(freq_scale, img_height);
-        let width = result.len() / img_height as usize;
-
-        println!(
-            "width={}, img_height={}, result.len={}",
-            width,
-            img_height,
-            result.len()
-        );
-
-        // let mut img: Vec<u8> = vec![0u8; width * img_height * 4];
+        let result = self.to_buffer(freq_scale, w_img, h_img);
+        let width = result.len() / h_img as usize;
 
         let mut writer = csv::Writer::from_path(fname)?;
+
         // Create the CSV header
-        let mut csv_record: Vec<String> = (0..width * img_height)
+        let mut csv_record: Vec<String> = (0..width * h_img)
             .into_iter()
             .map(|x| x.to_string())
             .collect();
         writer.write_record(&csv_record)?;
 
         let mut i = 0;
-        for _ in 0..img_height {
+        for _ in 0..h_img {
             for c_rec in csv_record.iter_mut().take(width) {
                 let val = result[i];
                 i += 1;
                 *c_rec = val.to_string();
-                //self.get_real(val).to_string();
             }
             writer.write_record(&csv_record)?;
         }
@@ -196,58 +179,169 @@ impl Spectrogram {
     ///
     ///  * `freq_scale` - Apply the log function to the frequency scale.
     ///
-    fn spec_to_buffer(&self, freq_scale: FrequencyScale, img_height: usize) -> Vec<f32> {
-        // // Only the data below 1/2 of the sampling rate (nyquist frequency)
-        // // is useful
+    fn to_buffer(
+        &self,
+        freq_scale: FrequencyScale,
+        img_width: usize,
+        img_height: usize,
+    ) -> Vec<f32> {
+        let mut buf = Vec::with_capacity(self.height * self.width);
 
-        let mut result = Vec::with_capacity(img_height * self.width);
-        for h in 0..self.height {
-            for w in 0..self.width {
-                result.push(self.data[w][h]);
+        // Apply the log scale if required
+        match freq_scale {
+            FrequencyScale::Log => {
+                let scaler = FreqScaler::create(freq_scale, self.height, self.height);
+                let mut vert_slice = vec![0.0; self.height];
+                for h in 0..self.height {
+                    let (f1, f2) = scaler.scale(h);
+                    let (h1, mut h2) = (f1.floor() as usize, f2.ceil() as usize);
+                    if h2 >= self.height {
+                        h2 = self.height - 1;
+                    }
+                    for w in 0..self.width {
+                        for (hh, val) in vert_slice.iter_mut().enumerate().take(h2).skip(h1) {
+                            *val = self.spec[(hh * self.width) + w];
+                        }
+                        let value = integrate(f1, f2, &vert_slice);
+                        buf.push(value);
+                    }
+                }
+            }
+            FrequencyScale::Linear => {
+                buf.clone_from(&self.spec);
             }
         }
 
-        let (w1, h1) = (self.width, self.height);
-        let (w2, h2) = (512, 512);
-        // Destination buffer. Must be mutable.
-        let mut dst = vec![0.0; w2 * h2];
-        // Create reusable instance.
-        let mut resizer = resize::new(w1, h1, w2, h2, GrayF32, Lanczos3).unwrap();
-        // Do resize without heap allocations.
-        // Might be executed multiple times for different `src` or `dst`.
-        resizer.resize(result.as_gray(), dst.as_gray_mut()).unwrap();
-        dst
+        // Convert the buffer to dB
+        to_db(&mut buf);
+
+        resize(&buf, self.width, self.height, img_width, img_height)
+    }
+
+    pub fn get_min_max(&self) -> (f32, f32) {
+        get_min_max(&self.spec)
     }
 }
 
-// fn spec_to_buffer(&self, freq_scale: FrequencyScale, img_height: usize) -> Vec<f32> {
-//   // Only the data below 1/2 of the sampling rate (nyquist frequency)
-//   // is useful
+pub fn get_min_max(data: &[f32]) -> (f32, f32) {
+    let mut min = f32::MAX;
+    let mut max = f32::MIN;
+    for val in data {
+        min = f32::min(*val, min);
+        max = f32::max(*val, max);
+    }
+    (min, max)
+}
 
-//   // let img_height = 512;
+fn to_db(buf: &mut [f32]) {
+    let mut ref_db = f32::MIN;
+    buf.iter().for_each(|v| ref_db = f32::max(ref_db, *v));
 
-//   let scaler = FreqScaler::create(freq_scale, self.height, img_height);
-//   println!("self.height={}, self.width={}", self.height, self.width);
+    let amp_ref = ref_db * ref_db;
+    let offset = 10.0 * (f32::max(1e-10, amp_ref)).log10();
+    let mut log_spec_max = f32::MIN;
 
-//   let mut result = Vec::with_capacity(img_height * self.width);
-//   for h in 0..img_height {
-//     let (f1, f2) = scaler.scale(h);
-//     println!("{}, {}, {}, {}", h, f1, f2, self.data.len());
-//     for w in 0..self.width {
-//       let value = utility::integrate(f1, f2, &self.data[w]);
-//       result.push(value);
-//     }
-//   }
-//   // for h in 0..self.height {
-//   //   for w in 0..self.width {
-//   //     result.push(self.data[w][h]);
-//   //   }
-//   // }
-//   println!(
-//     "x,y,result.len()=({}, {}, {})",
-//     self.width,
-//     self.height,
-//     result.len()
-//   );
-//   result
-// }
+    for val in buf.iter_mut() {
+        *val = 10.0 * (f32::max(1e-10, *val * *val)).log10() - offset;
+        log_spec_max = f32::max(log_spec_max, *val);
+    }
+
+    for val in buf.iter_mut() {
+        *val = f32::max(*val, log_spec_max - 80.0);
+    }
+}
+
+fn resize(buf: &[f32], w_in: usize, h_in: usize, w_out: usize, h_out: usize) -> Vec<f32> {
+    // Resize the buffer to match the user requirements
+    if let Ok(mut resizer) = resize::new(w_in, h_in, w_out, h_out, GrayF32, Lanczos3) {
+        let mut resized_buf = vec![0.0; w_out * h_out];
+        let result = resizer.resize(buf.as_gray(), resized_buf.as_gray_mut());
+        if result.is_ok() {
+            return resized_buf;
+        }
+    }
+
+    // If this happens there resize return an Err
+    return vec![];
+}
+
+///
+/// Integrate `spec` from `y1` to `y2`, where `y1` and `y2` are
+/// floating point indicies where we take the fractional component into
+/// account as well.
+///
+/// Integration is uses simple linear interpolation.
+///
+/// # Arguments
+///
+/// * `y1` - The fractional index that points to `spec`.
+/// * `y2` - The fractional index that points to `spec`.
+/// * `spec` - The values that require integration.
+///
+/// # Returns
+///
+/// The integrated complex value.
+///
+fn integrate(x1: f32, x2: f32, spec: &[f32]) -> f32 {
+    let mut i_x1 = x1.floor() as usize;
+    let i_x2 = (x2 - 0.000001).floor() as usize;
+
+    // Calculate the ratio from
+    let area = |y, frac| y * frac;
+
+    if i_x1 >= i_x2 {
+        // Sub-cell integration
+        area(spec[i_x1], x2 - x1)
+    } else {
+        // Need to integrate from x1 to x2 over multiple indicies.
+        let mut result = area(spec[i_x1], (i_x1 + 1) as f32 - x1);
+        i_x1 += 1;
+        while i_x1 < i_x2 {
+            result += spec[i_x1];
+            i_x1 += 1;
+        }
+        if i_x1 >= spec.len() {
+            i_x1 = spec.len() - 1;
+        }
+        result += area(spec[i_x1], x2 - i_x1 as f32);
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_integrate() {
+        let v = vec![1.0, 2.0, 4.0, 1.123];
+
+        // No x distance
+        let c = integrate(0.0, 0.0, &v);
+        assert!((c - 0.0).abs() < 0.0001);
+
+        // No number boundary
+        let c = integrate(0.25, 1.0, &v);
+        assert!((c - 0.75).abs() < 0.0001);
+
+        let c = integrate(0.0, 1.0, &v);
+        assert!((c - 1.0).abs() < 0.0001);
+
+        let c = integrate(3.75, 4.0, &v);
+        assert!((c - 1.123 / 4.0).abs() < 0.0001);
+
+        let c = integrate(0.5, 1.0, &v);
+        assert!((c - 0.5).abs() < 0.0001);
+
+        // Accross one boundary
+        let c = integrate(0.75, 1.25, &v);
+        assert!((c - 0.75).abs() < 0.0001);
+
+        let c = integrate(1.8, 2.6, &v);
+        assert!((c - 2.8).abs() < 0.0001);
+
+        // Full Range
+        let c = integrate(0.0, 4.0, &v);
+        assert!((c - 8.123).abs() < 0.0001);
+    }
+}

@@ -92,14 +92,13 @@ impl SpecCompute {
 
     fn run_fft(&mut self) -> Spectrogram {
         let width = (self.data.len() - self.num_bins) / self.step_size;
+        let height = self.num_bins / 2;
 
-        let mut spectrogram = vec![vec![]];
-        spectrogram.clear();
-        spectrogram.reserve(width);
+        let mut spec = vec![0.0; self.num_bins * width];
 
-        let mut db_ref = f32::MIN;
-        let mut p = 0;
-        for _ in 0..width {
+        let mut p = 0; // Index to the beginning of the window
+
+        for w in 0..width {
             let mut signal: Vec<Complex<f32>> = self.data[p..]
                 .iter()
                 .take(self.num_bins)
@@ -112,46 +111,22 @@ impl SpecCompute {
             // TODO: Slight performance improvement to use `process_with_scratch()`
             self.fft_fn.process(&mut signal);
 
-            // Normalise the spectrogram
-            let v_spec: Vec<f32> = signal
+            // Normalise the spectrogram and write to the output
+            signal
                 .into_iter()
-                .take(self.num_bins / 2)
+                .take(height)
                 .rev()
-                .map(|c_val| {
-                    let val = c_val.norm();
-                    db_ref = f32::max(db_ref, val);
-                    val
-                })
-                .collect();
-
-            spectrogram.push(v_spec);
+                .map(|c_val| c_val.norm())
+                .enumerate()
+                .for_each(|(h, val)| spec[width * h + w] = val);
 
             p += self.step_size;
         }
-        amplitude_to_db(&mut spectrogram, db_ref * db_ref);
 
         Spectrogram {
-            data: spectrogram,
+            spec,
             width,
-            height: self.num_bins / 2,
-        }
-    }
-}
-
-fn amplitude_to_db(spectrogram: &mut Vec<Vec<f32>>, amp_ref: f32) {
-    let mut log_spec_max = f32::MIN;
-    let offset = 10.0 * (f32::max(1e-10, amp_ref)).log10();
-
-    for spec in spectrogram.iter_mut() {
-        for i in 0..spec.len() {
-            spec[i] = 10.0 * (f32::max(1e-10, spec[i] * spec[i])).log10() - offset;
-            log_spec_max = f32::max(log_spec_max, spec[i]);
-        }
-    }
-
-    for spec in spectrogram.iter_mut() {
-        for i in 0..spec.len() {
-            spec[i] = f32::max(spec[i], log_spec_max - 80.0);
+            height,
         }
     }
 }

@@ -261,20 +261,22 @@ fn main() {
     if matches.is_present("png") {
         let png_file = matches.value_of("png").unwrap();
         spectrograph
-            .to_png(std::path::Path::new(png_file), freq_scale, &mut gradient)
+            .to_png(std::path::Path::new(png_file), freq_scale, &mut gradient, width, height)
             .unwrap()
     }
 
     if matches.is_present("csv") {
         let csv_file = matches.value_of("csv").unwrap();
         spectrograph
-            .to_csv(std::path::Path::new(csv_file), freq_scale)
+            .to_csv(std::path::Path::new(csv_file), freq_scale, width, height)
             .unwrap()
     }
 
     if matches.is_present("legend") {
-        gradient.set_max(0.0);
-        gradient.set_min(-80.0);
+        let (min, max) = spectrograph.get_min_max();
+        gradient.set_min(min);
+        gradient.set_max(max);
+
 
         let legend_file = matches.value_of("legend").unwrap();
         let width = 20;
