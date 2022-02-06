@@ -32,11 +32,11 @@ use rustfft::{num_complex::Complex, FftPlanner};
 /// # Example
 ///
 /// ```Rust
-///   let mut spectrograph = SpecOptionsBuilder::new(512, 128)
+///   let mut spectrograph = SpecOptionsBuilder::new(2048)
 ///     .load_data_from_file(&std::path::Path::new(wav_file))?
 ///     .build();
 ///  
-///   spectrograph.compute(2048, 0.8);
+///   spectrograph.compute();
 ///   spectrograph.save_as_png(&std::path::Path::new(png_file), false)?;
 /// ```
 ///
@@ -66,6 +66,10 @@ impl SpecCompute {
         }
     }
 
+    ///
+    /// Update the sample data with a new set.  Note, none of the settings
+    /// from the builder are applied, all the samples are used in their raw form.
+    ///
     pub fn set_data(&mut self, data: Vec<f32>) {
         self.data = data;
     }
@@ -79,18 +83,6 @@ impl SpecCompute {
     ///                 power of 2.
     ///
     pub fn compute(&mut self) -> Spectrogram {
-        let overlap = 1.0 - self.step_size as f32 / self.num_bins as f32;
-
-        println!("Computing spectrogram...");
-        println!("Bins: {}", self.num_bins);
-        println!("Overlap: {}", overlap);
-        println!("Step len: {}", self.step_size);
-        println!("Number of samples: {}", self.data.len());
-
-        self.run_fft()
-    }
-
-    fn run_fft(&mut self) -> Spectrogram {
         let width = (self.data.len() - self.num_bins) / self.step_size;
         let height = self.num_bins / 2;
 

@@ -153,16 +153,26 @@ impl SpecOptionsBuilder {
         self
     }
 
+    ///
+    /// Set the audio channel to use when importing a WAV file.
+    /// By default this is 1.
+    ///
     pub fn channel(mut self, channel: u16) -> Self {
         self.channel = channel;
         self
     }
 
+    ///
+    /// Normalise all the sample values to range from -1.0 to 1.0.
+    ///
     pub fn normalise(mut self) -> Self {
         self.do_normalise = true;
         self
     }
 
+    ///
+    /// Scale the sample data by the given amount.
+    ///
     pub fn scale(mut self, scale_factor: f32) -> Self {
         self.scale_factor = Some(scale_factor);
         self
@@ -181,13 +191,23 @@ impl SpecOptionsBuilder {
         self
     }
 
+    ///
+    /// This is the step size (as the number of samples) between each
+    /// application of the window function.  A smaller step size may
+    /// increase the smoothness of the sample, but take more time.  The default
+    /// step size, if not set, is the same as the number of FFT bins.  This
+    /// there is no overlap between windows and it most cases will suit your
+    /// needs.
+    ///
     pub fn set_step_size(mut self, step_size: usize) -> Self {
         self.step_size = step_size;
         self
     }
 
-    /// Last method to be called.  This will calculate the colour gradients and
-    /// generate an instance of [Spectrograph].
+    ///
+    /// The final method to be called.  This will create an instance of
+    /// [Spectrograph].
+    ///
     pub fn build(mut self) -> Result<SpecCompute, SonogramError> {
         if self.data.is_empty() {
             // SpecOptionsBuilder requires data to be loaded

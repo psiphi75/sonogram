@@ -82,8 +82,8 @@ struct Args {
     #[clap(arg_enum, long, default_value_t = WinFunc::Hann)]
     window_fn: WinFunc,
 
-    /// The type of scale to use for frequency [possible values: log, linear]
-    #[clap(long, default_value_t = String::from("linear"), value_name = "TYPE")]
+    /// The type of scale to use for frequency
+    #[clap(long, default_value_t = String::from("linear"), value_name = "TYPE", possible_values=&["linear", "log"])]
     freq_scale: String,
 
     /// The number of samples to step for each window, zero mean default
@@ -140,6 +140,12 @@ fn main() {
         );
     }
 
+    let stepsize = if args.stepsize == 0 {
+        args.bins
+    } else {
+        args.stepsize
+    };
+
     let window_fn = match args.window_fn {
         WinFunc::BlackmanHarris => sonogram::blackman_harris,
         WinFunc::Rectangular => sonogram::rectangular,
@@ -157,7 +163,14 @@ fn main() {
         .channel(args.channel)
         .downsample(args.downsample)
         .set_window_fn(window_fn)
-        .set_step_size(args.stepsize);
+        .set_step_size(stepsize);
+
+    let overlap = 1.0 - stepsize as f32 / args.bins as f32;
+
+    println!("Computing spectrogram...");
+    println!("Bins: {}", args.bins);
+    println!("Overlap: {}", overlap);
+    println!("Step size: {}", stepsize);
 
     //
     // Do the spectrograph

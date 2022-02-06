@@ -55,7 +55,10 @@ impl Spectrogram {
     /// # Arguments
     ///
     ///  * `fname` - The path to the PNG to save to the filesystem.
-    ///  * `freq_scale` - Apply the log function to the frequency scale.
+    ///  * `freq_scale` - The type of frequency scale to use for the spectrogram.
+    ///  * `gradient` - The colour gradient to use for the spectrogram.
+    ///  * `w_img` - The output image width.
+    ///  * `h_img` - The output image height.
     ///
     pub fn to_png(
         &mut self,
@@ -65,21 +68,10 @@ impl Spectrogram {
         w_img: usize,
         h_img: usize,
     ) -> Result<(), std::io::Error> {
-        let result = self.to_buffer(freq_scale, w_img, h_img);
-
-        let (min, max) = get_min_max(&result);
-        gradient.set_min(min);
-        gradient.set_max(max);
+        let buf = self.to_buffer(freq_scale, w_img, h_img);
 
         let mut img: Vec<u8> = vec![0u8; w_img * h_img * 4];
-        for (i, val) in result.iter().take(w_img * h_img).enumerate() {
-            let value = *val;
-            let colour = gradient.get_colour(value).to_vec();
-            img[i * 4] = colour[0];
-            img[i * 4 + 1] = colour[1];
-            img[i * 4 + 2] = colour[2];
-            img[i * 4 + 3] = colour[3];
-        }
+        self.buf_to_img(&buf, &mut img, gradient);
 
         let file = File::create(fname)?;
         let w = &mut BufWriter::new(file);
@@ -96,29 +88,25 @@ impl Spectrogram {
     ///
     /// # Arguments
     ///
-    ///  * `freq_scale` - Apply the log function to the frequency scale.
+    ///  * `freq_scale` - The type of frequency scale to use for the spectrogram.
+    ///  * `gradient` - The colour gradient to use for the spectrogram.
+    ///  * `w_img` - The output image width.
+    ///  * `h_img` - The output image height.
     ///
     pub fn to_png_in_memory(
         &mut self,
         freq_scale: FrequencyScale,
-        gradient: ColourGradient,
+        gradient: &mut ColourGradient,
+        w_img: usize,
+        h_img: usize,
     ) -> Result<Vec<u8>, std::io::Error> {
-        let img_height = 512;
-        let img_width = 512;
-        let result = self.to_buffer(freq_scale, img_width, img_height);
+        let buf = self.to_buffer(freq_scale, w_img, h_img);
 
-        let mut img: Vec<u8> = vec![0u8; result.len() * 4];
-        for (i, val) in result.iter().enumerate() {
-            let colour = gradient.get_colour(*val).to_vec();
-            img[i * 4] = colour[0];
-            img[i * 4 + 1] = colour[1];
-            img[i * 4 + 2] = colour[2];
-            img[i * 4 + 3] = colour[3];
-        }
+        let mut img: Vec<u8> = vec![0u8; w_img * h_img * 4];
+        self.buf_to_img(&buf, &mut img, gradient);
 
         let mut pngbuf: Vec<u8> = Vec::new();
-
-        let mut encoder = png::Encoder::new(&mut pngbuf, result.len() as u32, self.height as u32);
+        let mut encoder = png::Encoder::new(&mut pngbuf, img.len() as u32, self.height as u32);
         encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
         let mut writer = encoder.write_header()?;
         writer.write_image_data(&img)?;
@@ -128,36 +116,52 @@ impl Spectrogram {
         Ok(pngbuf)
     }
 
+    /// Convenience function to convert the the buffer to an image
+    fn buf_to_img(&self, buf: &[f32], img: &mut [u8], gradient: &mut ColourGradient) {
+        let (min, max) = get_min_max(buf);
+        gradient.set_min(min);
+        gradient.set_max(max);
+
+        for (i, val) in buf.iter().enumerate() {
+            let colour = gradient.get_colour(*val).to_vec();
+            img[i * 4] = colour[0];
+            img[i * 4 + 1] = colour[1];
+            img[i * 4 + 2] = colour[2];
+            img[i * 4 + 3] = colour[3];
+        }
+    }
+
     ///
     /// Save the calculated spectrogram as a CSV file.
     ///
     /// # Arguments
     ///
     ///  * `fname` - The path to the CSV to save to the filesystem.
-    ///  * `freq_scale` - Apply the log function to the frequency scale.
+    ///  * `freq_scale` - The type of frequency scale to use for the spectrogram.
+    ///  * `cols` - The number of columns.
+    ///  * `rows` - The number of rows.
     ///
     pub fn to_csv(
         &mut self,
         fname: &Path,
         freq_scale: FrequencyScale,
-        w_img: usize,
-        h_img: usize,
+        cols: usize,
+        rows: usize,
     ) -> Result<(), std::io::Error> {
-        let result = self.to_buffer(freq_scale, w_img, h_img);
-        let width = result.len() / h_img as usize;
+        let result = self.to_buffer(freq_scale, cols, rows);
 
         let mut writer = csv::Writer::from_path(fname)?;
 
         // Create the CSV header
-        let mut csv_record: Vec<String> = (0..width * h_img)
+        let mut csv_record: Vec<String> = (0..cols * rows)
             .into_iter()
             .map(|x| x.to_string())
             .collect();
         writer.write_record(&csv_record)?;
 
         let mut i = 0;
-        for _ in 0..h_img {
-            for c_rec in csv_record.iter_mut().take(width) {
+        for _ in 0..rows {
+            for c_rec in csv_record.iter_mut().take(cols) {
                 let val = result[i];
                 i += 1;
                 *c_rec = val.to_string();
@@ -173,11 +177,14 @@ impl Spectrogram {
     ///
     /// Map the spectrogram to the output buffer.  Essentially scales the
     /// frequency to map to the vertical axis (y-axis) of the output and
-    /// scale the x-axis to match the output.
+    /// scale the x-axis to match the output.  It will also convert the
+    /// spectrogram to dB.
     ///
     /// # Arguments
     ///
-    ///  * `freq_scale` - Apply the log function to the frequency scale.
+    ///  * `freq_scale` - The type of frequency scale to use for the spectrogram.
+    ///  * `img_width` - The output image width.
+    ///  * `img_height` - The output image height.
     ///
     fn to_buffer(
         &self,
@@ -218,6 +225,9 @@ impl Spectrogram {
         resize(&buf, self.width, self.height, img_width, img_height)
     }
 
+    ///
+    /// Get the minimum and maximum values from the current spectrogram.
+    ///
     pub fn get_min_max(&self) -> (f32, f32) {
         get_min_max(&self.spec)
     }
@@ -251,6 +261,9 @@ fn to_db(buf: &mut [f32]) {
     }
 }
 
+///
+/// Resize the image buffer
+///
 fn resize(buf: &[f32], w_in: usize, h_in: usize, w_out: usize, h_out: usize) -> Vec<f32> {
     // Resize the buffer to match the user requirements
     if let Ok(mut resizer) = resize::new(w_in, h_in, w_out, h_out, GrayF32, Lanczos3) {
@@ -266,7 +279,7 @@ fn resize(buf: &[f32], w_in: usize, h_in: usize, w_out: usize, h_out: usize) -> 
 }
 
 ///
-/// Integrate `spec` from `y1` to `y2`, where `y1` and `y2` are
+/// Integrate `spec` from `x1` to `x2`, where `x1` and `x2` are
 /// floating point indicies where we take the fractional component into
 /// account as well.
 ///
@@ -274,13 +287,13 @@ fn resize(buf: &[f32], w_in: usize, h_in: usize, w_out: usize, h_out: usize) -> 
 ///
 /// # Arguments
 ///
-/// * `y1` - The fractional index that points to `spec`.
-/// * `y2` - The fractional index that points to `spec`.
+/// * `x1` - The fractional index that points to `spec`.
+/// * `x2` - The fractional index that points to `spec`.
 /// * `spec` - The values that require integration.
 ///
 /// # Returns
 ///
-/// The integrated complex value.
+/// The result of the integration.
 ///
 fn integrate(x1: f32, x2: f32, spec: &[f32]) -> f32 {
     let mut i_x1 = x1.floor() as usize;
