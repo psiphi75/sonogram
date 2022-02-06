@@ -16,7 +16,7 @@ plots are common names of similar things.
 ## Running the command line appplication
 
 ```sh
-cargo run --release --bin sonogram -- --wav input.wav --png ouput.png
+cargo run --release --bin sonogram -- --wav samples/trumpet.wav --png output.png
 ```
 
 ## Saving to a `.png` file
@@ -25,16 +25,24 @@ cargo run --release --bin sonogram -- --wav input.wav --png ouput.png
 let waveform: Vec<i16> = vec![/* ... some data ... */];
 
 // Build the model
-let mut spectrograph = SpecOptionsBuilder::new(512, 128)
+let spectrograph = SpecOptionsBuilder::new(2048)
   .load_data_from_memory(waveform)
-  .build();
+  .build().unwrap();
 
 // Compute the spectrogram giving the number of bins and the window overlap.
-spectrograph.compute(2048, 0.8);
+spectrograph.compute();
+
+// Specify a colour gradient to use (note you can create custom ones)
+let mut gradient = ColourGradient::create(ColourTheme::from(args.gradient));
 
 // Save the spectrogram to PNG.
 let png_file = std::path::Path::new("path/to/file.png");
-spectrograph.save_as_png(&png_file, FrequencyScale::Linear)?;
+spectrograph.save_as_png(&png_file, 
+            FrequencyScale::Linear,
+            &mut gradient,
+            512,    // Height
+            512,    // Width
+        ).unwrap();
 ```
 
 ## Customise the colour gradient
@@ -59,8 +67,5 @@ spec_builder.set_gradient(gradient);
 ```
 
 ## License
-
-The code in this repository is based on the [C++ code developed by
-Christian Briones](https://github.com/cwbriones/cpp-spectrogram).
 
 This source is released under the GPLv3 license. Read the LICENSE file for legal information.

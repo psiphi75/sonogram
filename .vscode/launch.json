@@ -29,7 +29,15 @@
           "kind": "bin"
         }
       },
-      "args": ["--wav", "${workspaceFolder}/samples/Globular-PoppingOut.wav", "--png", "test.png"],
+      "args": ["--wav", "${workspaceFolder}/samples/Globular-PoppingOut.wav", 
+               "--png", "${workspaceFolder}/debug.png", 
+               "--legend", "${workspaceFolder}/debug_legend.png", 
+               "--width", "512", 
+               "--height", "512", 
+               "--bins", "2048", 
+               "--stepsize", "500",
+               "--freq-scale", "log",
+               "-f", "hann"],
       "cwd": "${workspaceFolder}"
     },
     {

@@ -26,123 +26,119 @@
 ///
 #[derive(Clone, Copy)]
 pub enum FrequencyScale {
-  Linear,
-  Log,
+    Linear,
+    Log,
 }
 
 pub struct FreqScaler;
 
 impl FreqScaler {
-  ///
-  /// Create an instance of [FreqScalerTrait] given the [FrequencyScale].
-  ///
-  /// # Arguments
-  ///
-  /// * `freq_scale` - The [FrequencyScale] to implement.
-  /// * `nyquist_len` - the half the data length, i.e. the nyquist frequency.
-  /// * `height` - The output grid/image height in cells/pixels.
-  pub fn create(
-    freq_scale: FrequencyScale,
-    nyquist_len: f32,
-    height: f32,
-  ) -> Box<dyn FreqScalerTrait> {
-    match freq_scale {
-      FrequencyScale::Linear => Box::new(LinearFreq::init(nyquist_len, height)),
-      FrequencyScale::Log => Box::new(LogFreq::init(nyquist_len, height)),
+    ///
+    /// Create an instance of [FreqScalerTrait] given the [FrequencyScale].
+    ///
+    /// # Arguments
+    ///
+    /// * `freq_scale` - The [FrequencyScale] to implement.
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
+    pub fn create(
+        freq_scale: FrequencyScale,
+        f_max_orig: usize,
+        f_max_new: usize,
+    ) -> Box<dyn FreqScalerTrait> {
+        match freq_scale {
+            FrequencyScale::Linear => {
+                Box::new(LinearFreq::init(f_max_orig as f32, f_max_new as f32))
+            }
+            FrequencyScale::Log => Box::new(LogFreq::init(f_max_orig as f32, f_max_new as f32)),
+        }
     }
-  }
 }
 
 pub trait FreqScalerTrait {
-  /// Initialise the scaler object, can put cached values here.
-  fn init(nyquist_len: f32, height: f32) -> Self
-  where
-    Self: Sized;
+    /// Initialise the scaler object, can put cached values here.
+    fn init(f_max_orig: f32, height: f32) -> Self
+    where
+        Self: Sized;
 
-  /// The y->(f1,f2) scaler function
-  fn scale(&self, y: usize) -> (f32, f32);
+    /// The y->(f1,f2) scaler function
+    fn scale(&self, y: usize) -> (f32, f32);
+}
+
+/// Scale the frequncy linearly.
+pub struct LinearFreq {
+    ratio: f32,
+}
+
+impl FreqScalerTrait for LinearFreq {
+    /// Initialise the scaler.
+    ///
+    /// # Arguments
+    ///
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
+    ///
+    fn init(f_max_orig: f32, f_max_new: f32) -> Self {
+        Self {
+            ratio: f_max_orig / f_max_new,
+        }
+    }
+
+    /// Scale the y axis value to match the y of the image.
+    ///
+    /// # Arguments
+    ///
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
+    ///
+    /// # Returns
+    ///
+    /// * A pair describing the lower bound and upper bound of the range.
+    ///
+    fn scale(&self, y: usize) -> (f32, f32) {
+        let f1 = self.ratio * y as f32;
+        let f2 = self.ratio * ((y + 1) as f32);
+        (f1, f2)
+    }
 }
 
 ///
 /// Scale the frequncy to a Log (base E) frequency scale.
 ///
 pub struct LogFreq {
-  nyquist_len: f32,
-  height: f32,
-  log_coef: f32,
+    log_coef: f32,
 }
 
 impl FreqScalerTrait for LogFreq {
-  ///
-  /// Initialise the scaler.
-  ///
-  /// # Arguments
-  ///
-  /// * `nyquist_len` - the half the data length, i.e. the nyquist frequency.
-  /// * `height` - The output grid/image height in cells/pixels.
-  ///
-  fn init(nyquist_len: f32, height: f32) -> Self {
-    Self {
-      nyquist_len,
-      height,
-      log_coef: 1.0 / (height + 1.0).ln() * nyquist_len,
+    ///
+    /// Initialise the scaler.
+    ///
+    /// # Arguments
+    ///
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
+    ///
+    fn init(f_max_orig: f32, f_max_new: f32) -> Self {
+        Self {
+            log_coef: f_max_orig / f_max_new.ln(),
+        }
     }
-  }
 
-  ///
-  /// Scale the y axis value to match the y of the image.
-  ///
-  /// # Arguments
-  ///
-  /// * `nyquist_len` - the half the data length, i.e. the nyquist frequency.
-  /// * `height` - The output grid/image height in cells/pixels.
-  ///
-  /// # Returns
-  ///
-  /// * A pair describing the lower bound and upper bound of the range
-  ///
-  fn scale(&self, y: usize) -> (f32, f32) {
-    let f1 = self.nyquist_len - (self.log_coef * (self.height + 1.0 - y as f32).ln());
-    let f2 = self.nyquist_len - (self.log_coef * (self.height + 1.0 - (y + 1) as f32).ln());
-    (f1, f2)
-  }
-}
-
-/// Scale the frequncy linearly.
-pub struct LinearFreq {
-  nyquist_len: f32,
-  height: f32,
-}
-
-impl FreqScalerTrait for LinearFreq {
-  /// Initialise the scaler.
-  ///
-  /// # Arguments
-  ///
-  /// * `nyquist_len` - the half the data length, i.e. the nyquist frequency.
-  /// * `height` - The output grid/image height in cells/pixels.
-  ///
-  fn init(nyquist_len: f32, height: f32) -> Self {
-    Self {
-      nyquist_len,
-      height,
+    ///
+    /// Scale the y axis value to match the y of the image.
+    ///
+    /// # Arguments
+    ///
+    /// * `f_max_orig` - the half the data length, i.e. the nyquist frequency.
+    /// * `f_max_new` - The output grid/image height in cells/pixels.
+    ///
+    /// # Returns
+    ///
+    /// * A pair describing the lower bound and upper bound of the range
+    ///
+    fn scale(&self, y: usize) -> (f32, f32) {
+        let f1 = self.log_coef * (y as f32).ln();
+        let f2 = self.log_coef * ((y + 1) as f32).ln();
+        (f1, f2)
     }
-  }
-
-  /// Scale the y axis value to match the y of the image.
-  ///
-  /// # Arguments
-  ///
-  /// * `nyquist_len` - the half the data length, i.e. the nyquist frequency.
-  /// * `height` - The output grid/image height in cells/pixels.
-  ///
-  /// # Returns
-  ///
-  /// * A pair describing the lower bound and upper bound of the range.
-  ///
-  fn scale(&self, y: usize) -> (f32, f32) {
-    let f1 = (y as f32 / self.height) * self.nyquist_len;
-    let f2 = ((y + 1) as f32 / self.height) * self.nyquist_len;
-    (f1, f2)
-  }
 }
