@@ -40,4 +40,3 @@ pub fn blackman_harris(n: usize, samples: usize) -> f32 {
 
     A0 - A1 * f32::cos(arg) + A2 * f32::cos(2.0 * arg) - A3 * f32::cos(3.0 * arg)
 }
-

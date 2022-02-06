@@ -35,9 +35,9 @@ use rustfft::{num_complex::Complex, FftPlanner};
 ///   let mut spectrograph = SpecOptionsBuilder::new(2048)
 ///     .load_data_from_file(&std::path::Path::new(wav_file))?
 ///     .build();
-///  
+///   
+///   // Compute the spectrogram.  Need export it using `to_png()` or simlar.
 ///   spectrograph.compute();
-///   spectrograph.save_as_png(&std::path::Path::new(png_file), false)?;
 /// ```
 ///
 pub struct SpecCompute {

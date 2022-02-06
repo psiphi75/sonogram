@@ -37,11 +37,11 @@ let mut gradient = ColourGradient::create(ColourTheme::from(args.gradient));
 
 // Save the spectrogram to PNG.
 let png_file = std::path::Path::new("path/to/file.png");
-spectrograph.save_as_png(&png_file, 
+spectrograph.to_png(&png_file, 
             FrequencyScale::Linear,
             &mut gradient,
-            512,    // Height
             512,    // Width
+            512,    // Height
         ).unwrap();
 ```
 
