@@ -123,11 +123,11 @@ impl Spectrogram {
         gradient.set_max(max);
 
         for (i, val) in buf.iter().enumerate() {
-            let colour = gradient.get_colour(*val).to_vec();
-            img[i * 4] = colour[0];
-            img[i * 4 + 1] = colour[1];
-            img[i * 4 + 2] = colour[2];
-            img[i * 4 + 3] = colour[3];
+            let colour = gradient.get_colour(*val);
+            img[i * 4] = colour.r;
+            img[i * 4 + 1] = colour.g;
+            img[i * 4 + 2] = colour.b;
+            img[i * 4 + 3] = colour.a;
         }
     }
 

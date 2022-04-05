@@ -205,12 +205,11 @@ fn main() {
         let legend = gradient.to_legend(width, height);
 
         let mut img: Vec<u8> = vec![0u8; width * height * 4];
-        for (i, col) in legend.iter().take(width * height).enumerate() {
-            let colour = col.to_vec();
-            img[i * 4] = colour[0];
-            img[i * 4 + 1] = colour[1];
-            img[i * 4 + 2] = colour[2];
-            img[i * 4 + 3] = colour[3];
+        for (i, color) in legend.iter().take(width * height).enumerate() {
+            img[i * 4] = color.r;
+            img[i * 4 + 1] = color.g;
+            img[i * 4 + 2] = color.b;
+            img[i * 4 + 3] = color.a;
         }
 
         let file = File::create(&args.legend.unwrap()).unwrap();
