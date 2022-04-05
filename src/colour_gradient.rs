@@ -138,6 +138,11 @@ impl ColourGradient {
         let ratio = scaled_value - idx_value as f32;
         let (i, j) = (idx_value, idx_value + 1);
 
+        // Prevent over indexing after index computation
+        if j >= self.colours.len() {
+            return self.colours.last().unwrap().clone();
+        }
+
         // Get the colour band
         let first = self.colours[i].clone();
         let second = self.colours[j].clone();
