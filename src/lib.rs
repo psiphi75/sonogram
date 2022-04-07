@@ -147,13 +147,13 @@ impl Spectrogram {
         gradient.set_min(min);
         gradient.set_max(max);
 
-        for (i, val) in buf.iter().enumerate() {
-            let colour = gradient.get_colour(*val);
-            img[i * 4] = colour.r;
-            img[i * 4 + 1] = colour.g;
-            img[i * 4 + 2] = colour.b;
-            img[i * 4 + 3] = colour.a;
-        }
+        // For each pixel, compute the RGBAColour, then assign each byte to output img
+        buf
+            .iter()
+            .map(|val| gradient.get_colour(*val))
+            .flat_map(|c| [c.r, c.g, c.b, c.a].into_iter())
+            .zip(img.iter_mut())
+            .for_each(|(val_rgba, img_rgba)| *img_rgba = val_rgba);
     }
 
     ///
