@@ -177,7 +177,7 @@ impl Spectrogram {
         let mut writer = csv::Writer::from_path(fname)?;
 
         // Create the CSV header
-        let mut csv_record: Vec<String> = (0..cols * rows)
+        let mut csv_record: Vec<String> = (0..cols)
             .into_iter()
             .map(|x| x.to_string())
             .collect();
