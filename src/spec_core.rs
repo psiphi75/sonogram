@@ -17,7 +17,7 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::f32;
+use std::{f32, cmp::min};
 use std::sync::Arc;
 
 use crate::{Spectrogram, WindowFn};
@@ -90,27 +90,38 @@ impl SpecCompute {
 
         let mut p = 0; // Index to the beginning of the window
 
+        // Once, Allocate buffers that will be used for computation
+        let mut inplace_buf: Vec<Complex<f32>> = vec![Complex::new(0., 0.); self.num_bins];
+        let mut scratch_buf: Vec<Complex<f32>> = vec![Complex::new(0., 0.); self.fft_fn.get_inplace_scratch_len()];
+
+        // Create slices into the buffers backing the Vecs to be reused on each loop
+        let inplace_slice = &mut inplace_buf[..];
+        let scratch_slice = &mut scratch_buf[..];
+
         for w in 0..width {
-            let mut signal: Vec<Complex<f32>> = self.data[p..]
+            // Extract the next `num_bins` complex floats into the FFT inplace compute buffer
+            self.data[p..]
                 .iter()
                 .take(self.num_bins)
                 .enumerate()
                 .map(|(i, val)| val * (self.window_fn)(i, self.num_bins)) // Apply the window function
                 .map(|val| Complex::new(val, 0.0))
-                .collect();
+                .zip(inplace_slice.iter_mut())
+                .for_each(|(c, v)| *v = c);
 
-            // Do the FFT, this will take the singal, and write back into to.
-            // TODO: Slight performance improvement to use `process_with_scratch()`
-            self.fft_fn.process(&mut signal);
+            // Call out to rustfft to actually compute the FFT
+            // This will take the inplace_slice as input, use scratch_slice during computation, and write FFT back into inplace_slice
+            let inplace = &mut inplace_slice[..min(self.num_bins, self.data.len() - p)];
+            self.fft_fn.process_with_scratch(inplace, scratch_slice);
 
-            // Normalise the spectrogram and write to the output
-            signal
-                .into_iter()
+            // Normalize the spectrogram and write to the output
+            inplace
+                .iter()
                 .take(height)
                 .rev()
                 .map(|c_val| c_val.norm())
-                .enumerate()
-                .for_each(|(h, val)| spec[width * h + w] = val);
+                .zip(spec[w..].iter_mut().step_by(width))
+                .for_each(|(a, b)| *b = a);
 
             p += self.step_size;
         }

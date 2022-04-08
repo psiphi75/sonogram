@@ -204,14 +204,10 @@ fn main() {
         let height = 250;
         let legend = gradient.to_legend(width, height);
 
-        let mut img: Vec<u8> = vec![0u8; width * height * 4];
-        for (i, col) in legend.iter().take(width * height).enumerate() {
-            let colour = col.to_vec();
-            img[i * 4] = colour[0];
-            img[i * 4 + 1] = colour[1];
-            img[i * 4 + 2] = colour[2];
-            img[i * 4 + 3] = colour[3];
-        }
+        let img = legend
+            .iter()
+            .flat_map(|colour| [colour.r, colour.g, colour.b, colour.a].into_iter())
+            .collect::<Vec<u8>>();
 
         let file = File::create(&args.legend.unwrap()).unwrap();
         let buf = &mut BufWriter::new(file);

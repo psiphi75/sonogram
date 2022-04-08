@@ -27,19 +27,15 @@ pub enum ColourTheme {
 /// Colours required for a PNG file, includes the alpha channel.
 #[derive(Clone, PartialEq, Debug)]
 pub struct RGBAColour {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
 }
 
 impl RGBAColour {
     pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
-    }
-
-    pub fn to_vec(&self) -> Vec<u8> {
-        vec![self.r, self.g, self.b, self.a]
     }
 }
 
@@ -137,6 +133,11 @@ impl ColourGradient {
         let idx_value = scaled_value.floor() as usize;
         let ratio = scaled_value - idx_value as f32;
         let (i, j) = (idx_value, idx_value + 1);
+
+        // Prevent over indexing after index computation
+        if j >= self.colours.len() {
+            return self.colours.last().unwrap().clone();
+        }
 
         // Get the colour band
         let first = self.colours[i].clone();

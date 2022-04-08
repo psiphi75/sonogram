@@ -116,19 +116,44 @@ impl Spectrogram {
         Ok(pngbuf)
     }
 
+    ///
+    /// Create the spectrogram in memory as raw RGBA format.
+    ///
+    /// # Arguments
+    ///
+    ///  * `freq_scale` - The type of frequency scale to use for the spectrogram.
+    ///  * `gradient` - The colour gradient to use for the spectrogram.
+    ///  * `w_img` - The output image width.
+    ///  * `h_img` - The output image height.
+    ///
+    pub fn to_rgba_in_memory(
+        &mut self,
+        freq_scale: FrequencyScale,
+        gradient: &mut ColourGradient,
+        w_img: usize,
+        h_img: usize,
+    ) -> Vec<u8> {
+        let buf = self.to_buffer(freq_scale, w_img, h_img);
+
+        let mut img: Vec<u8> = vec![0u8; w_img * h_img * 4];
+        self.buf_to_img(&buf, &mut img, gradient);
+
+        img
+    }
+
     /// Convenience function to convert the the buffer to an image
     fn buf_to_img(&self, buf: &[f32], img: &mut [u8], gradient: &mut ColourGradient) {
         let (min, max) = get_min_max(buf);
         gradient.set_min(min);
         gradient.set_max(max);
 
-        for (i, val) in buf.iter().enumerate() {
-            let colour = gradient.get_colour(*val).to_vec();
-            img[i * 4] = colour[0];
-            img[i * 4 + 1] = colour[1];
-            img[i * 4 + 2] = colour[2];
-            img[i * 4 + 3] = colour[3];
-        }
+        // For each pixel, compute the RGBAColour, then assign each byte to output img
+        buf
+            .iter()
+            .map(|val| gradient.get_colour(*val))
+            .flat_map(|c| [c.r, c.g, c.b, c.a].into_iter())
+            .zip(img.iter_mut())
+            .for_each(|(val_rgba, img_rgba)| *img_rgba = val_rgba);
     }
 
     ///
