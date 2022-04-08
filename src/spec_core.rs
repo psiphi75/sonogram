@@ -17,8 +17,8 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::{f32, cmp::min};
 use std::sync::Arc;
+use std::{cmp::min, f32};
 
 use crate::{Spectrogram, WindowFn};
 use rustfft::{num_complex::Complex, FftPlanner};
@@ -92,7 +92,8 @@ impl SpecCompute {
 
         // Once, Allocate buffers that will be used for computation
         let mut inplace_buf: Vec<Complex<f32>> = vec![Complex::new(0., 0.); self.num_bins];
-        let mut scratch_buf: Vec<Complex<f32>> = vec![Complex::new(0., 0.); self.fft_fn.get_inplace_scratch_len()];
+        let mut scratch_buf: Vec<Complex<f32>> =
+            vec![Complex::new(0., 0.); self.fft_fn.get_inplace_scratch_len()];
 
         // Create slices into the buffers backing the Vecs to be reused on each loop
         let inplace_slice = &mut inplace_buf[..];

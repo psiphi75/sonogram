@@ -148,8 +148,7 @@ impl Spectrogram {
         gradient.set_max(max);
 
         // For each pixel, compute the RGBAColour, then assign each byte to output img
-        buf
-            .iter()
+        buf.iter()
             .map(|val| gradient.get_colour(*val))
             .flat_map(|c| [c.r, c.g, c.b, c.a].into_iter())
             .zip(img.iter_mut())
