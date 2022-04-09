@@ -207,7 +207,7 @@ impl Spectrogram {
     ///  * `img_width` - The output image width.
     ///  * `img_height` - The output image height.
     ///
-    fn to_buffer(
+    pub fn to_buffer(
         &self,
         freq_scale: FrequencyScale,
         img_width: usize,
