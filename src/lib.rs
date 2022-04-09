@@ -177,10 +177,7 @@ impl Spectrogram {
         let mut writer = csv::Writer::from_path(fname)?;
 
         // Create the CSV header
-        let mut csv_record: Vec<String> = (0..cols * rows)
-            .into_iter()
-            .map(|x| x.to_string())
-            .collect();
+        let mut csv_record: Vec<String> = (0..cols).into_iter().map(|x| x.to_string()).collect();
         writer.write_record(&csv_record)?;
 
         let mut i = 0;
@@ -210,7 +207,7 @@ impl Spectrogram {
     ///  * `img_width` - The output image width.
     ///  * `img_height` - The output image height.
     ///
-    fn to_buffer(
+    pub fn to_buffer(
         &self,
         freq_scale: FrequencyScale,
         img_width: usize,
