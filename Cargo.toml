@@ -10,11 +10,18 @@ repository = "https://github.com/psiphi75/sonogram"
 keywords = ["spectrogram", "spectrograph", "audio", "fft", "dft"]
 categories = ["multimedia::images", "science", "multimedia::audio", "visualization"]
 
+[features]
+default = [ "hound", "png" ]
+build-binary = ["clap"]
+
+[[bin]]
+name = "sonogram"
+required-features = ["build-binary"]
 
 [dependencies]
-hound = "3.4"
-clap = { version = "3.0.14", features = ["derive"] }
-png = "0.14"
+hound = { version = "3.4", optional = true }
+clap = { version = "3.0.14", features = ["derive"], optional = true }
+png = { version = "0.14", optional = true }
 csv = "1.1"
 rustfft = "6.0"
 resize = "0.7.2"
