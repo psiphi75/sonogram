@@ -4,6 +4,7 @@ use std::io;
 #[derive(Debug)]
 pub enum SonogramError {
     Io(io::Error),
+    #[cfg(feature = "hound")]
     Hound(hound::Error),
 
     // Our own errors
@@ -19,6 +20,7 @@ impl From<io::Error> for SonogramError {
     }
 }
 
+#[cfg(feature = "hound")]
 impl From<hound::Error> for SonogramError {
     fn from(err: hound::Error) -> SonogramError {
         SonogramError::Hound(err)

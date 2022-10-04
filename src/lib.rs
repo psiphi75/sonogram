@@ -16,6 +16,7 @@
  */
 
 extern crate csv;
+#[cfg(feature = "png")]
 extern crate png;
 
 mod builder;
@@ -32,7 +33,9 @@ pub use freq_scales::{FreqScaler, FrequencyScale};
 pub use spec_core::SpecCompute;
 pub use window_fn::*;
 
+#[cfg(feature = "png")]
 use std::fs::File;
+#[cfg(feature = "png")]
 use std::io::BufWriter;
 use std::path::Path;
 
@@ -40,6 +43,7 @@ use resize::Pixel::GrayF32;
 use resize::Type::Lanczos3;
 use rgb::FromSlice;
 
+#[cfg(feature = "png")]
 use png::HasParameters; // To use encoder.set()
 
 pub struct Spectrogram {
@@ -60,6 +64,7 @@ impl Spectrogram {
     ///  * `w_img` - The output image width.
     ///  * `h_img` - The output image height.
     ///
+    #[cfg(feature = "png")]
     pub fn to_png(
         &mut self,
         fname: &Path,
@@ -93,6 +98,7 @@ impl Spectrogram {
     ///  * `w_img` - The output image width.
     ///  * `h_img` - The output image height.
     ///
+    #[cfg(feature = "png")]
     pub fn to_png_in_memory(
         &mut self,
         freq_scale: FrequencyScale,
