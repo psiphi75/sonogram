@@ -302,7 +302,7 @@ fn resize(buf: &[f32], w_in: usize, h_in: usize, w_out: usize, h_out: usize) -> 
     }
 
     // If this happens there resize return an Err
-    return vec![];
+    vec![]
 }
 
 ///

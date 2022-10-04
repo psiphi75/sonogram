@@ -13,10 +13,12 @@ _Example output `.png`:_
 \*Note: sonogram, spectrograph, spectrogram, or power spectral density
 plots are common names of similar things.
 
-## Running the command line appplication
+## Build and run the command line appplication
 
 ```sh
-cargo run --release --bin sonogram -- --wav samples/trumpet.wav --png output.png
+cargo build --release --bin sonogram --features=build-binary
+
+./target/release/sonogram --wav samples/trumpet.wav --png output.png
 ```
 
 ## Saving to a `.png` file

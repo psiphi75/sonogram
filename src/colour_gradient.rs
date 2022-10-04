@@ -25,7 +25,7 @@ pub enum ColourTheme {
 }
 
 /// Colours required for a PNG file, includes the alpha channel.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct RGBAColour {
     pub r: u8,
     pub g: u8,
