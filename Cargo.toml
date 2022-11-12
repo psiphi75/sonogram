@@ -11,7 +11,7 @@ keywords = ["spectrogram", "spectrograph", "audio", "fft", "dft"]
 categories = ["multimedia::images", "science", "multimedia::audio", "visualization"]
 
 [features]
-default = [ "hound", "png" ]
+default = [ "hound", "png", "rayon" ]
 build-binary = ["clap"]
 
 [[bin]]
@@ -26,3 +26,4 @@ csv = "1.1"
 rustfft = "6.0"
 resize = "0.7.2"
 rgb = "0.8.25"
+rayon = { version = "1.5.3", optional = true }

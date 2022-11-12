@@ -249,6 +249,14 @@ impl Spectrogram {
         // Convert the buffer to dB
         to_db(&mut buf);
 
+        println!(
+            "buf len: {} ({} {}) -> ({} {})",
+            buf.len(),
+            self.width,
+            self.height,
+            img_width,
+            img_height
+        );
         resize(&buf, self.width, self.height, img_width, img_height)
     }
 
