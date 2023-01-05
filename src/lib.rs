@@ -112,7 +112,7 @@ impl Spectrogram {
         self.buf_to_img(&buf, &mut img, gradient);
 
         let mut pngbuf: Vec<u8> = Vec::new();
-        let mut encoder = png::Encoder::new(&mut pngbuf, img.len() as u32, self.height as u32);
+        let mut encoder = png::Encoder::new(&mut pngbuf, w_img as u32, h_img as u32);
         encoder.set(png::ColorType::RGBA).set(png::BitDepth::Eight);
         let mut writer = encoder.write_header()?;
         writer.write_image_data(&img)?;
