@@ -153,8 +153,6 @@ impl SpecCompute {
             p += self.step_size;
         }
 
-        println!("Computed spectrogram with {} ({}, {})", spec.len(), height, width);
-
         Spectrogram {
             spec,
             width,
