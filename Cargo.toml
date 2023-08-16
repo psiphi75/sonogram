@@ -26,4 +26,4 @@ csv = "1.1"
 rustfft = "6.0"
 resize = "0.7.2"
 rgb = "0.8.25"
-rayon = { version = "1.5.3", optional = true }
+rayon = { version = "1.7.0", optional = true }

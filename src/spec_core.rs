@@ -17,7 +17,7 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::{cmp::min, f32};
 
 use crate::{Spectrogram, WindowFn};
@@ -178,7 +178,8 @@ impl SpecCompute {
     ///               casting to complex.
     ///
     #[cfg(feature = "rayon")]
-    pub fn par_compute(&self, data: &[f32]) -> Spectrogram {
+    pub fn par_compute(&self, data: Option<&[f32]>) -> Spectrogram {
+        let data = data.unwrap_or(self.data.as_slice());
         let width = (data.len() - self.num_bins) / self.step_size;
         let height = self.num_bins / 2;
 
