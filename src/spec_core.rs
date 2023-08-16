@@ -38,7 +38,7 @@ use rayon::prelude::*;
 ///   let mut spectrograph = SpecOptionsBuilder::new(2048)
 ///     .load_data_from_file(&std::path::Path::new(wav_file))?
 ///     .build();
-///   
+///
 ///   // Compute the spectrogram.  Need export it using `to_png()` or simlar.
 ///   spectrograph.compute();
 /// ```
@@ -55,7 +55,7 @@ pub struct SpecCompute {
 }
 
 impl SpecCompute {
-    /// Create a new Spectrograph from data.  
+    /// Create a new Spectrograph from data.
     ///
     /// **You probably want to use [SpecOptionsBuilder] instead.**
     pub fn new(num_bins: usize, step_size: usize, data: Vec<f32>, window_fn: WindowFn) -> Self {
@@ -162,86 +162,70 @@ impl SpecCompute {
 
     ///
     /// Do the discrete fourier transform to create the spectrogram.
-    /// 
+    ///
     /// This function will use rayon to parallelize the FFT computation.
-    /// It may create more FFT plans than there are threads, but will reuse them 
+    /// It may create more FFT plans than there are threads, but will reuse them
     /// if called multiple times.
     ///
     ///
     /// # Arguments
-    /// 
+    ///
     ///  * `self` -  `self` is immutable so that the FFT plans can be shared between threads.
-    ///               Since the FFT plans are not thread safe, they are wrapped in a Mutex. 
+    ///               Since the FFT plans are not thread safe, they are wrapped in a Mutex.
     ///
     ///  * `data` -  The time domain data to compute the spectrogram from.
-    ///              `data` is not preprocessed other than windowing and 
+    ///              `data` is not preprocessed other than windowing and
     ///               casting to complex.
     ///
     #[cfg(feature = "rayon")]
     pub fn par_compute(&self, data: &[f32]) -> Spectrogram {
-        use std::cell::RefCell;
-
         let width = (data.len() - self.num_bins) / self.step_size;
         let height = self.num_bins / 2;
 
         // Compute the spectrogram in parallel steps via rayon
         let spec_cols: Vec<_> = (0..width)
             .into_par_iter()
-            .map(
-                |w| {
-                    // Grab the FFT for this thread
-                    thread_local! {
-                        pub static FFT_FN: RefCell<Option<Arc<dyn rustfft::Fft<f32>>>> = RefCell::new(None);
-                        pub static INPLACE_BUF: RefCell<Option<Vec<Complex<f32>>>> = RefCell::new(None);
-                        pub static SCRATCH_BUF: RefCell<Option<Vec<Complex<f32>>>> = RefCell::new(None);
-                    }
-
+            .map_init(|| {
+                let fft_fn = (self.gen_fft_fn)();
+                let scratch_buf = vec![Complex::new(0., 0.); fft_fn.get_inplace_scratch_len()];
+                    (
+                        fft_fn,
+                        vec![Complex::new(0., 0.); self.num_bins],
+                        scratch_buf,
+                    )
+                }, | (fft_fn, inplace_buf, scratch_buf), w| {
                     // Index to the beginning of the window
                     let window_index = w * self.step_size;
 
-                    // All the computation on the column happens in this thread where we have exclusive access to the memory
-                    let spec_col = FFT_FN.with(|fft_fn| {
-                        let fft_fn = fft_fn.borrow_mut().get_or_insert_with(|| (self.gen_fft_fn)()).clone();
-                        INPLACE_BUF.with(|inplace_buf| {
-                            let mut inplace_buf_ref = inplace_buf.borrow_mut();
-                            let inplace_buf = inplace_buf_ref.get_or_insert_with(|| vec![Complex::new(0., 0.); self.num_bins]);
-                            SCRATCH_BUF.with(|scratch_buf| {
-                                let mut scratch_buf_ref = scratch_buf.borrow_mut();
-                                let scratch_buf = scratch_buf_ref.get_or_insert_with(|| vec![Complex::new(0., 0.); fft_fn.get_inplace_scratch_len()]);
+                    // Extract the next `num_bins` complex floats into the FFT inplace compute buffer
+                    data[(w * self.step_size)..]
+                    .iter()
+                    .take(self.num_bins)
+                    .enumerate()
+                    .map(|(i, val)| Complex::new(val * (self.window_fn)(i, self.num_bins), 0.))
+                    .zip(inplace_buf.iter_mut())
+                    .for_each(|(c, v)| *v = c);
 
-                                // Extract the next `num_bins` complex floats into the FFT inplace compute buffer
-                                data[(w * self.step_size)..]
-                                .iter()
-                                .take(self.num_bins)
-                                .enumerate()
-                                .map(|(i, val)| Complex::new(val * (self.window_fn)(i, self.num_bins), 0.))
-                                .zip(inplace_buf.iter_mut())
-                                .for_each(|(c, v)| *v = c);
-            
-                                // Create slices into the buffers backing the Vecs to be reused on each loop
-                                let inplace_slice = inplace_buf.as_mut_slice();
-                                let scratch_slice = scratch_buf.as_mut_slice();
-            
-                                // Call out to rustfft to actually compute the FFT
-                                // This will take the inplace_slice as input, use scratch_slice during computation, and write FFT back into inplace_slice
-                                let inplace =
-                                    &mut inplace_slice[..min(self.num_bins, data.len() - window_index)];
-                                fft_fn.process_with_scratch(inplace, scratch_slice);
-            
-                                // Normalize the spectrogram and write to the output
-                                inplace
-                                    .iter()
-                                    .take(height)
-                                    .rev()
-                                    .map(|c_val| c_val.norm())
-                                    .collect::<Vec<_>>()
-                            })
-                        })
-                    });
+                    // Create slices into the buffers backing the Vecs to be reused on each loop
+                    let inplace_slice = inplace_buf.as_mut_slice();
+                    let scratch_slice = scratch_buf.as_mut_slice();
+
+                    // Call out to rustfft to actually compute the FFT
+                    // This will take the inplace_slice as input, use scratch_slice during computation, and write FFT back into inplace_slice
+                    let inplace =
+                        &mut inplace_slice[..min(self.num_bins, data.len() - window_index)];
+                    fft_fn.process_with_scratch(inplace, scratch_slice);
+
+                    // Normalize the spectrogram and write to the output
+                    let spec_col =   inplace
+                        .iter()
+                        .take(height)
+                        .rev()
+                        .map(|c_val| c_val.norm())
+                        .collect::<Vec<_>>();
 
                     spec_col
-                },
-            )
+                })
             .collect();
 
 
