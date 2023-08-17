@@ -175,15 +175,10 @@ fn main() {
     //
     // Do the spectrograph
     //
-    let mut spectrograph =
     #[cfg(feature = "rayon")]
-    {
-        spec_builder.build().unwrap().par_compute(None)
-    };
+    let mut spectrograph = spec_builder.build().unwrap().par_compute(None);
     #[cfg(not(feature = "rayon"))]
-    {
-        spec_builder.build().unwrap().compute()
-    };
+    let mut spectrograph = spec_builder.build().unwrap().compute();
 
     if args.png.is_some() {
         spectrograph
