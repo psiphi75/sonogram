@@ -43,9 +43,9 @@ impl RGBAColour {
 /// PNG created.
 #[derive(Clone, Debug)]
 pub struct ColourGradient {
-    colours: Vec<RGBAColour>,
-    min: f32,
-    max: f32,
+    pub colours: Vec<RGBAColour>,
+    pub min: f32,
+    pub max: f32,
 }
 
 impl ColourGradient {
@@ -181,14 +181,6 @@ impl ColourGradient {
 
     pub fn set_min(&mut self, min: f32) {
         self.min = min;
-    }
-
-    pub fn get_max(&self) -> f32 {
-        self.max
-    }
-
-    pub fn get_min(&self) -> f32 {
-        self.min
     }
 }
 
