@@ -182,6 +182,14 @@ impl ColourGradient {
     pub fn set_min(&mut self, min: f32) {
         self.min = min;
     }
+
+    pub fn get_max(&self) -> f32 {
+        self.max
+    }
+
+    pub fn get_min(&self) -> f32 {
+        self.min
+    }
 }
 
 impl Default for ColourGradient {
