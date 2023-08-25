@@ -22,6 +22,7 @@ pub enum ColourTheme {
     Rainbow,
     BlackWhite, // Black background to white foreground.
     WhiteBlack, // White background to black foreground.
+    LightDark, // Light background for minimum values, dark background for maximum values.
 }
 
 /// Colours required for a PNG file, includes the alpha channel.
@@ -64,6 +65,7 @@ impl ColourGradient {
             ColourTheme::Rainbow => Self::rainbow_theme(),
             ColourTheme::BlackWhite => Self::black_white_theme(),
             ColourTheme::WhiteBlack => Self::white_black_theme(),
+            ColourTheme::LightDark => Self::light_dark_theme(),
         }
     }
 
@@ -112,6 +114,17 @@ impl ColourGradient {
         let mut result = ColourGradient::new();
         result.add_colour(RGBAColour::new(255, 255, 255, 255)); // White
         result.add_colour(RGBAColour::new(0, 0, 0, 255)); // Black
+        result
+    }
+
+    pub fn light_dark_theme() -> Self {
+        let mut result = ColourGradient::new();
+        result.add_colour(RGBAColour::new(215, 215, 215, 255)); // Grey
+        result.add_colour(RGBAColour::new(246, 55, 55, 255)); // Red
+        // result.add_colour(RGBAColour::new(227, 61, 215, 255)); // Pink
+        result.add_colour(RGBAColour::new(114, 169, 242, 255)); // Blue
+        result.add_colour(RGBAColour::new(75, 0, 130, 255)); // Indigo
+        result.add_colour(RGBAColour::new(55, 0, 110, 255)); // Purple
         result
     }
 
