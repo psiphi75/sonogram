@@ -46,6 +46,9 @@ use rgb::FromSlice;
 #[cfg(feature = "png")]
 use png::HasParameters; // To use encoder.set()
 
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
+
 pub struct Spectrogram {
     spec: Vec<f32>,
     width: usize,
@@ -270,6 +273,43 @@ pub fn get_min_max(data: &[f32]) -> (f32, f32) {
     (min, max)
 }
 
+#[cfg(feature = "rayon")]
+fn to_db(buf: &mut [f32]) {
+    let ref_db = buf
+        .par_chunks(1_000)
+        .fold(
+            || f32::MIN,
+            |acc, chunk| {
+                let v = chunk.iter().fold(f32::MIN, |acc, &v| f32::max(acc, v));
+                if acc > v {
+                    acc
+                } else {
+                    v
+                }
+            },
+        )
+        .reduce(|| f32::MIN, |acc, v| f32::max(acc, v));
+
+    let amp_ref = ref_db * ref_db;
+    let offset = 10.0 * (f32::max(1e-10, amp_ref)).log10();
+    let log_spec_max = buf
+        .par_iter_mut()
+        .map(|val| {
+            *val = 10.0 * (f32::max(1e-10, *val * *val)).log10() - offset;
+            *val
+        })
+        .fold(|| f32::MIN, |acc, v| f32::max(acc, v))
+        .reduce(|| f32::MIN, |acc, v| f32::max(acc, v));
+    let log_spec_max = log_spec_max - 80.0; // Why 80?  I don't know
+
+    buf.par_chunks_mut(1_000).for_each(|chunk| {
+        for val in chunk.iter_mut() {
+            *val = f32::max(*val, log_spec_max);
+        }
+    });
+}
+
+#[cfg(not(feature = "rayon"))]
 fn to_db(buf: &mut [f32]) {
     let mut ref_db = f32::MIN;
     buf.iter().for_each(|v| ref_db = f32::max(ref_db, *v));
