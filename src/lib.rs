@@ -263,6 +263,13 @@ impl Spectrogram {
     }
 
     ///
+    /// Get the width and height of the spectrogram.
+    ///
+    pub fn shape(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
+
+    ///
     /// Get an iterator over the spectrogram data by row index.
     ///
     pub fn row_iter<'a>(&'a self, row_idx: usize) -> impl Iterator<Item = &'a f32> + 'a {
