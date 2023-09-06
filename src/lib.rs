@@ -261,6 +261,17 @@ impl Spectrogram {
     pub fn get_min_max(&self) -> (f32, f32) {
         get_min_max(&self.spec)
     }
+
+    ///
+    /// Get an iterator over the spectrogram data by row index.
+    ///
+    pub fn row_iter<'a>(&'a self, row_idx: usize) -> impl Iterator<Item = &'a f32> + 'a {
+        self.spec
+            .chunks_exact(self.width)
+            .skip(row_idx)
+            .flatten()
+            .take(self.width)
+    }
 }
 
 pub fn get_min_max(data: &[f32]) -> (f32, f32) {
