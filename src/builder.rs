@@ -132,8 +132,7 @@ impl SpecOptionsBuilder {
     ///
     /// # Arguments
     ///
-    ///  * `data` - The raw wavform data that will be converted to a spectrogram.
-    ///             Samples must be in the range -1.0 to 1.0.
+    ///  * `data` - The raw wavform data that will be converted to a spectrogram. Samples must be in the range -1.0 to 1.0.
     ///  * `sample_rate` - The sample rate, in Hz, of the data.
     ///
     pub fn load_data_from_memory_f32(mut self, data: Vec<f32>, sample_rate: u32) -> Self {

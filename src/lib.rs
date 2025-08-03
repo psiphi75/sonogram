@@ -61,8 +61,7 @@ impl Spectrogram {
     ///
     /// # Arguments
     /// 
-    ///  * `buf` - The raw buffer of data to create the spectrogram from, real
-    ///            numbers only.
+    ///  * `buf` - The raw buffer of data to create the spectrogram from, real numbers only.
     ///  * `width` - The width of the spectrogram.
     ///  * `height` - The height of the spectrogram.
     ///
@@ -214,7 +213,7 @@ impl Spectrogram {
         let mut writer = csv::Writer::from_path(fname)?;
 
         // Create the CSV header
-        let mut csv_record: Vec<String> = (0..cols).into_iter().map(|x| x.to_string()).collect();
+        let mut csv_record: Vec<String> = (0..cols).map(|x| x.to_string()).collect();
         writer.write_record(&csv_record)?;
 
         let mut i = 0;

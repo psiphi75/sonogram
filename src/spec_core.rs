@@ -79,8 +79,7 @@ impl SpecCompute {
     ///
     /// # Arguments
     ///
-    ///  * `n_fft` - How many fourier transform frequency bins to use. Must be a
-    ///                 power of 2.
+    ///  * `n_fft` - How many fourier transform frequency bins to use. Must be a power of 2.
     ///
     pub fn compute(&mut self) -> Spectrogram {
         let width = (self.data.len() - self.num_bins) / self.step_size;
