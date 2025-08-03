@@ -55,12 +55,12 @@ pub struct Spectrogram {
 
 impl Spectrogram {
     ///
-    /// Create a new Spectrogram from a raw buffer.  It must of the correct size 
-    /// (width * height).  But can be of any numeric type that can be converted 
+    /// Create a new Spectrogram from a raw buffer.  It must of the correct size
+    /// (width * height).  But can be of any numeric type that can be converted
     /// to f32.
     ///
     /// # Arguments
-    /// 
+    ///
     ///  * `buf` - The raw buffer of data to create the spectrogram from, real numbers only.
     ///  * `width` - The width of the spectrogram.
     ///  * `height` - The height of the spectrogram.
