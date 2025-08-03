@@ -30,6 +30,7 @@ pub use builder::SpecOptionsBuilder;
 pub use colour_gradient::{ColourGradient, ColourTheme, RGBAColour};
 pub use errors::SonogramError;
 pub use freq_scales::{FreqScaler, FrequencyScale};
+use num_traits::NumCast;
 pub use spec_core::SpecCompute;
 pub use window_fn::*;
 
@@ -53,6 +54,36 @@ pub struct Spectrogram {
 }
 
 impl Spectrogram {
+    ///
+    /// Create a new Spectrogram from a raw buffer.  It must of the correct size 
+    /// (width * height).  But can be of any numeric type that can be converted 
+    /// to f32.
+    ///
+    /// # Arguments
+    /// 
+    ///  * `buf` - The raw buffer of data to create the spectrogram from, real
+    ///            numbers only.
+    ///  * `width` - The width of the spectrogram.
+    ///  * `height` - The height of the spectrogram.
+    ///
+    pub fn from_raw<T: NumCast + Copy>(
+        buf: &[T],
+        width: usize,
+        height: usize,
+    ) -> Result<Spectrogram, SonogramError> {
+        if buf.len() != width * height {
+            return Err(SonogramError::InvalidRawDataSize);
+        }
+
+        let spec = Spectrogram {
+            spec: buf.iter().map(|&x| NumCast::from(x).unwrap()).collect(),
+            width,
+            height,
+        };
+
+        Ok(spec)
+    }
+
     ///
     /// Save the calculated spectrogram as a PNG image.
     ///
@@ -383,5 +414,14 @@ mod tests {
         // Full Range
         let c = integrate(0.0, 4.0, &v);
         assert!((c - 8.123).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_from_raw() {
+        let raw = vec![-1i16, -2, -3, 4, 5, 6];
+        let spec = Spectrogram::from_raw(&raw, 2, 3).unwrap();
+        assert_eq!(spec.width, 2);
+        assert_eq!(spec.height, 3);
+        assert_eq!(spec.spec, vec![-1.0f32, -2.0, -3.0, 4.0, 5.0, 6.0]);
     }
 }

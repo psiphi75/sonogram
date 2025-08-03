@@ -12,6 +12,7 @@ pub enum SonogramError {
     InvalidChannel,
     InvalidDivisor,
     IncompleteData,
+    InvalidRawDataSize,
 }
 
 impl From<io::Error> for SonogramError {
